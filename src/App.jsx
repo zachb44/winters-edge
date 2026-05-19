@@ -304,8 +304,19 @@ function saveGame(state, map, fog) {
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') { clearSave(); return null; }
+    const { state, map, fog } = data;
+    if (!state || !state.player || typeof state.day !== 'number'
+        || !PROFESSIONS[state.profession]
+        || !Array.isArray(map) || !Array.isArray(fog)) {
+      clearSave();
+      return null;
+    }
+    return data;
   } catch {
+    clearSave();
     return null;
   }
 }
@@ -342,12 +353,16 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
     gameSpeed: 1, paused: true, dead: false, rescued: false,
     scenario,
     nextCrateDay: 4,
+    nextRespawnDay: 5,
     currentEvent: null,
     eventEffects: {},
     pendingCarcass: null,
     pendingTraveler: null,
+    lootCounts: {},
   };
 };
+
+const LOOT_BUDGET = { [T.PLANE]: 3, [T.CABIN]: 4 };
 
 function visibilityAt(fog, px, py, x, y) {
   const dx = x - px, dy = y - py;
@@ -376,7 +391,13 @@ export default function WintersEdge() {
   const [playerBob, setPlayerBob] = useState(0);
   const [footprints, setFootprints] = useState([]);
   const [mapScale, setMapScale] = useState(1);
-  const [hasSavedGame, setHasSavedGame] = useState(() => !!loadGame());
+  const [savedGameMeta, setSavedGameMeta] = useState(() => {
+    const s = loadGame();
+    return s ? { day: s.state.day, profession: s.state.profession } : null;
+  });
+  const refreshSavedMeta = useCallback((stateLike) => {
+    setSavedGameMeta({ day: stateLike.day, profession: stateLike.profession });
+  }, []);
   const tickRef = useRef(0);
 
   useEffect(() => {
@@ -405,16 +426,22 @@ export default function WintersEdge() {
       { type: 'rabbit', x: 35, y: 25, hp: 10, hostile: false },
       { type: 'rabbit', x: 25, y: 15, hp: 10, hostile: false },
       { type: 'rabbit', x: 15, y: 32, hp: 10, hostile: false },
+      { type: 'rabbit', x: 45, y: 22, hp: 10, hostile: false },
       { type: 'deer', x: 48, y: 6, hp: 20, hostile: false },
       { type: 'deer', x: 52, y: 11, hp: 20, hostile: false },
+      { type: 'deer', x: 44, y: 14, hp: 20, hostile: false },
       { type: 'wolf', x: 52, y: 25, hp: 25, hostile: true },
       { type: 'wolf', x: 10, y: 30, hp: 25, hostile: true },
+      { type: 'wolf', x: 8, y: 38, hp: 25, hostile: true },
       { type: 'boar', x: 22, y: 35, hp: 35, hostile: true, aggro: false },
+      { type: 'boar', x: 28, y: 38, hp: 35, hostile: true, aggro: false },
       { type: 'bear', x: 50, y: 38, hp: 80, hostile: true, territorial: true, homeX: 50, homeY: 38 },
       { type: 'seal', x: 11, y: 14, hp: 15, hostile: false },
       { type: 'seal', x: 9, y: 17, hp: 15, hostile: false },
+      { type: 'seal', x: 13, y: 11, hp: 15, hostile: false },
       { type: 'raven', x: 30, y: 10, hp: 5, hostile: false },
       { type: 'raven', x: 40, y: 30, hp: 5, hostile: false },
+      { type: 'raven', x: 5, y: 5, hp: 5, hostile: false },
     ];
   }, []);
 
@@ -447,7 +474,7 @@ export default function WintersEdge() {
 
   const saveAndQuit = () => {
     saveGame(state, map, fog);
-    setHasSavedGame(true);
+    refreshSavedMeta(state);
     setGameStarted(false);
     setSetupStep('scenario');
   };
@@ -534,27 +561,27 @@ export default function WintersEdge() {
     setFootprints(prev => [...prev, { x: state.player.x, y: state.player.y, ts: Date.now() }].slice(-20));
   }, [state.player.x, state.player.y, gameStarted]);
 
-  // Autosave: latest snapshot held in a ref so the 30s interval doesn't restart
+  // Autosave: latest snapshot held in a ref so the 60s interval doesn't restart
   const saveSnapshotRef = useRef({ state, map, fog });
   useEffect(() => { saveSnapshotRef.current = { state, map, fog }; });
 
-  // Autosave every 30 seconds
+  // Autosave every 60 seconds
   useEffect(() => {
     if (!gameStarted) return;
     const id = setInterval(() => {
       const snap = saveSnapshotRef.current;
       if (snap.state.dead || snap.state.rescued) return;
       saveGame(snap.state, snap.map, snap.fog);
-      setHasSavedGame(true);
-    }, 30000);
+      refreshSavedMeta(snap.state);
+    }, 60000);
     return () => clearInterval(id);
-  }, [gameStarted]);
+  }, [gameStarted, refreshSavedMeta]);
 
   // Save on day change
   useEffect(() => {
     if (!gameStarted) return;
     saveGame(state, map, fog);
-    setHasSavedGame(true);
+    refreshSavedMeta(state);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.day]);
 
@@ -563,7 +590,7 @@ export default function WintersEdge() {
     if (!gameStarted) return;
     if (state.dead || state.rescued) {
       saveGame(state, map, fog);
-      setHasSavedGame(true);
+      refreshSavedMeta(state);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.dead, state.rescued]);
@@ -638,6 +665,29 @@ export default function WintersEdge() {
             s.rescued = true;
             s = addLog(s, '🎉 RESCUE HELICOPTER ARRIVES! You survived!');
             return s;
+          }
+
+          // Slow respawn at map edges (skips wolves/bears — they stay rare)
+          if (s.day >= (s.nextRespawnDay ?? 5)) {
+            const count = 1 + Math.floor(Math.random() * 2);
+            const stats = { rabbit: { hp: 10, hostile: false }, deer: { hp: 20, hostile: false }, raven: { hp: 5, hostile: false } };
+            for (let i = 0; i < count; i++) {
+              const r = Math.random();
+              const type = r < 0.5 ? 'rabbit' : r < 0.8 ? 'deer' : 'raven';
+              let sx, sy, tries = 0, ok = false;
+              while (tries < 30 && !ok) {
+                const edge = Math.floor(Math.random() * 4);
+                if (edge === 0) { sx = Math.floor(Math.random() * MAP_W); sy = Math.floor(Math.random() * 3); }
+                else if (edge === 1) { sx = Math.floor(Math.random() * MAP_W); sy = MAP_H - 1 - Math.floor(Math.random() * 3); }
+                else if (edge === 2) { sx = Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * MAP_H); }
+                else { sx = MAP_W - 1 - Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * MAP_H); }
+                const distToPlayer = Math.abs(sx - s.player.x) + Math.abs(sy - s.player.y);
+                if (map[sy] && TILE_DATA[map[sy][sx]].walkable && distToPlayer >= 10) ok = true;
+                tries++;
+              }
+              if (ok) s.animals = [...s.animals, { type, x: sx, y: sy, ...stats[type] }];
+            }
+            s.nextRespawnDay = s.day + 4 + Math.floor(Math.random() * 3);
           }
         }
 
@@ -898,38 +948,37 @@ export default function WintersEdge() {
         if (Math.random() < (prof.mods.miningBonus ? 0.55 : 0.4)) {
           setMap(m => { const nm = m.map(r => [...r]); nm[ty][tx] = T.SNOW; return nm; });
         }
-      } else if (tile === T.PLANE) {
-        let drops = rollFromTable('plane');
+      } else if (tile === T.PLANE || tile === T.CABIN) {
+        const key = `${tx},${ty}`;
+        const lootCounts = { ...(s.lootCounts || {}) };
+        const max = LOOT_BUDGET[tile];
+        const remaining = key in lootCounts ? lootCounts[key] : max;
+        if (remaining <= 0) {
+          s = addLog(s, 'Picked clean — nothing left here.');
+          return s;
+        }
+        const tableName = tile === T.PLANE ? 'plane' : 'cabin';
+        const label = tile === T.PLANE ? 'Found' : 'Cabin';
+        let drops = rollFromTable(tableName);
         if (prof.mods.lootReroll) {
-          const d2 = rollFromTable('plane');
+          const d2 = rollFromTable(tableName);
           const t1 = drops.reduce((sum, d) => sum + d.qty, 0);
           const t2 = d2.reduce((sum, d) => sum + d.qty, 0);
           if (t2 > t1) drops = d2;
         }
-        if (drops.length === 0) s = addLog(s, 'Nothing useful here.');
-        else {
+        if (drops.length === 0) {
+          s = addLog(s, 'Nothing useful this time.');
+        } else {
           for (const drop of drops) {
             s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
             const info = ITEM_INFO[drop.item];
-            s = addLog(s, `${info.icon} Found ${drop.qty}× ${info.name}`);
+            s = addLog(s, `${info.icon} ${label}: ${drop.qty}× ${info.name}`);
           }
-        }
-        s.player.stamina = Math.max(0, s.player.stamina - 3);
-      } else if (tile === T.CABIN) {
-        let drops = rollFromTable('cabin');
-        if (prof.mods.lootReroll) {
-          const d2 = rollFromTable('cabin');
-          const t1 = drops.reduce((sum, d) => sum + d.qty, 0);
-          const t2 = d2.reduce((sum, d) => sum + d.qty, 0);
-          if (t2 > t1) drops = d2;
-        }
-        if (drops.length === 0) s = addLog(s, 'Already picked clean.');
-        else {
-          for (const drop of drops) {
-            s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
-            const info = ITEM_INFO[drop.item];
-            s = addLog(s, `${info.icon} Cabin: ${drop.qty}× ${info.name}`);
+          lootCounts[key] = remaining - 1;
+          if (lootCounts[key] <= 0) {
+            s = addLog(s, '🗑️ Picked clean.');
           }
+          s.lootCounts = lootCounts;
         }
         s.player.stamina = Math.max(0, s.player.stamina - 3);
       }
@@ -1209,14 +1258,17 @@ export default function WintersEdge() {
               <h1 className="text-3xl font-bold text-sky-300">Winter's Edge</h1>
               <p className="text-slate-400 mt-2">A survival game in a frozen wilderness</p>
             </div>
-            {hasSavedGame && (
+            {savedGameMeta && (
               <div className="mb-6">
                 <button onClick={continueGame}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-lg">
-                  ▶ Continue Saved Game
+                  ▶ Continue Run
                 </button>
-                <button onClick={() => { clearSave(); setHasSavedGame(false); }}
-                  className="w-full mt-1 text-xs text-slate-400 hover:text-slate-200">
+                <div className="text-center text-xs text-slate-400 mt-1">
+                  Day {savedGameMeta.day} — {PROFESSIONS[savedGameMeta.profession]?.name || 'Survivor'}
+                </div>
+                <button onClick={() => { clearSave(); setSavedGameMeta(null); }}
+                  className="w-full mt-1 text-xs text-slate-500 hover:text-slate-300">
                   Delete saved game
                 </button>
               </div>
@@ -1428,6 +1480,11 @@ export default function WintersEdge() {
                 if (tile === undefined) return null;
                 const data = TILE_DATA[tile];
                 const vis = visibilityAt(fog, state.player.x, state.player.y, tx, ty);
+                const depleted = (tile === T.PLANE || tile === T.CABIN)
+                  && state.lootCounts && state.lootCounts[`${tx},${ty}`] === 0;
+                let filter = 'none';
+                if (vis === 1) filter = 'brightness(0.45) saturate(0.5)';
+                else if (depleted) filter = 'grayscale(0.7) opacity(0.55)';
                 return (
                   <div key={`${tx}-${ty}`}
                     onClick={() => vis > 0 && handleTileClick(tx, ty)}
@@ -1438,7 +1495,7 @@ export default function WintersEdge() {
                       left: vx * TILE, top: vy * TILE, width: TILE, height: TILE,
                       background: vis === 0 ? '#0a0a0f' : data.color,
                       fontSize: 22,
-                      filter: vis === 1 ? 'brightness(0.45) saturate(0.5)' : 'none',
+                      filter,
                       borderRight: '1px solid rgba(0,0,0,0.05)',
                       borderBottom: '1px solid rgba(0,0,0,0.05)',
                     }}>
@@ -1730,7 +1787,7 @@ export default function WintersEdge() {
                 {state.player.name} the {PROFESSIONS[state.profession].name}<br/>
                 {state.rescued ? `Made it on day ${state.day}.` : `Survived ${state.day} days.`}
               </div>
-              <button onClick={() => { clearSave(); setHasSavedGame(false); setGameStarted(false); setSetupStep('scenario'); }} className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded">
+              <button onClick={() => { clearSave(); setSavedGameMeta(null); setGameStarted(false); setSetupStep('scenario'); }} className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded">
                 New Game
               </button>
             </div>
