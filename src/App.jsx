@@ -24,7 +24,6 @@ import { HelpMenu } from './components/HelpMenu.jsx';
 import { DeathScreen } from './components/DeathScreen.jsx';
 import { DayBanner } from './components/DayBanner.jsx';
 import { LevelUpOverlay } from './components/LevelUpOverlay.jsx';
-import { LevelButton } from './components/LevelButton.jsx';
 import { StatUpgradeModal } from './components/StatUpgradeModal.jsx';
 import { useGameLoop } from './hooks/useGameLoop.js';
 
@@ -72,6 +71,8 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
     crashSiteName: '',
     deathCause: null,
     combatTarget: null,
+    harvestTarget: null,
+    tileHp: {},
     characterXp: 0,
     characterLevel: 1,
     unspentStatPoints: 0,
@@ -329,6 +330,15 @@ export default function WintersEdge() {
             }
           }
         }
+        // If we're walking to a harvest target, stop once adjacent.
+        if (prev.harvestTarget) {
+          const ht = prev.harvestTarget;
+          const td = Math.abs(ht.x - prev.player.x) + Math.abs(ht.y - prev.player.y);
+          if (td <= 1) {
+            setMoveTarget(null);
+            return prev;
+          }
+        }
         if (prev.player.x === tx && prev.player.y === ty) {
           setMoveTarget(null);
           return prev;
@@ -365,26 +375,7 @@ export default function WintersEdge() {
       let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
       const prof = PROFESSIONS[s.profession];
 
-      if (tile === T.TREE) {
-        const woodBonus = prof.mods.woodBonus || 1;
-        const earlyBonus = s.day <= 3 ? 1 : 0;
-        const amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus) + earlyBonus;
-        s.inventory.wood += amount;
-        s = gainXp(s, 'foraging', 5);
-        s = applyXp(s, XP_REWARDS.chopTree);
-        s.player.stamina = Math.max(0, s.player.stamina - 8);
-        s = addLog(s, `🪓 Chopped wood (+${amount})`);
-        setMap(m => { const nm = m.map(r => [...r]); nm[ty][tx] = T.SNOW; return nm; });
-        s.trees = { ...s.trees, [`${tx},${ty}`]: 6 };
-      } else if (tile === T.ROCK) {
-        s.inventory.stone += prof.mods.miningBonus ? 2 : 1;
-        s = applyXp(s, XP_REWARDS.mineRock);
-        s.player.stamina = Math.max(0, s.player.stamina - (prof.mods.miningBonus ? 7 : 10));
-        s = addLog(s, `⛏️ +${prof.mods.miningBonus ? 2 : 1} stone`);
-        if (Math.random() < (prof.mods.miningBonus ? 0.55 : 0.4)) {
-          setMap(m => { const nm = m.map(r => [...r]); nm[ty][tx] = T.SNOW; return nm; });
-        }
-      } else if (tile === T.PLANE || tile === T.CABIN) {
+      if (tile === T.PLANE || tile === T.CABIN) {
         const key = `${tx},${ty}`;
         const lootCounts = { ...(s.lootCounts || {}) };
         const max = LOOT_BUDGET[tile];
@@ -446,10 +437,17 @@ export default function WintersEdge() {
   };
 
   const engage = (animal) => {
-    setState(prev => ({ ...prev, combatTarget: animal.id }));
+    setState(prev => ({ ...prev, combatTarget: animal.id, harvestTarget: null }));
     const d = Math.abs(animal.x - state.player.x) + Math.abs(animal.y - state.player.y);
     const range = (state.inventory.hunting_bow > 0 || state.inventory.rifle > 0) ? 3 : 1;
     if (d > range) setMoveTarget({ x: animal.x, y: animal.y });
+    else setMoveTarget(null);
+  };
+
+  const engageHarvest = (tx, ty, tile) => {
+    setState(prev => ({ ...prev, harvestTarget: { x: tx, y: ty, tile }, combatTarget: null }));
+    const d = Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y);
+    if (d > 1) setMoveTarget({ x: tx, y: ty });
     else setMoveTarget(null);
   };
 
@@ -629,7 +627,9 @@ export default function WintersEdge() {
         setMenu(null);
         setSelectedBuild(null);
         setStatModalOpen(false);
-        setState(s => s.combatTarget !== null ? ({ ...s, combatTarget: null }) : s);
+        setState(s => (s.combatTarget !== null || s.harvestTarget !== null)
+          ? ({ ...s, combatTarget: null, harvestTarget: null })
+          : s);
       }
     };
     window.addEventListener('keydown', handle);
@@ -660,14 +660,21 @@ export default function WintersEdge() {
     const animal = state.animals.find(a => a.x === tx && a.y === ty && a.hp > 0);
     if (animal) { engage(animal); return; }
 
-    // Non-animal click: disengage combat
-    if (state.combatTarget !== null) setState(prev => ({ ...prev, combatTarget: null }));
+    const tile = map[ty] && map[ty][tx];
+    if (tile === T.TREE || tile === T.ROCK) {
+      engageHarvest(tx, ty, tile);
+      return;
+    }
+
+    // Non-engageable click: disengage both combat and harvest
+    if (state.combatTarget !== null || state.harvestTarget !== null) {
+      setState(prev => ({ ...prev, combatTarget: null, harvestTarget: null }));
+    }
 
     const building = state.buildings.find(b => b.x === tx && b.y === ty);
     if (building && d <= 1) { interactBuilding(building); return; }
 
-    const tile = map[ty] && map[ty][tx];
-    if (tile === T.TREE || tile === T.ROCK || tile === T.PLANE || tile === T.CABIN) {
+    if (tile === T.PLANE || tile === T.CABIN) {
       interact(tx, ty);
       return;
     }
@@ -700,7 +707,7 @@ export default function WintersEdge() {
         @keyframes auroraShift { 0% { transform: translateX(-10%); opacity: 0.6; } 100% { transform: translateX(10%); opacity: 1; } }
       `}</style>
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto">
-        <GameUI state={state} setState={setState} onSaveAndQuit={saveAndQuit} />
+        <GameUI state={state} setState={setState} onSaveAndQuit={saveAndQuit} onOpenStatModal={() => setStatModalOpen(true)} />
 
         <div className="flex flex-1 min-h-0 gap-2 p-1">
           <MapView
@@ -754,7 +761,6 @@ export default function WintersEdge() {
 
         <DayBanner banner={dayBanner} />
         <LevelUpOverlay banner={levelUpBanner} />
-        <LevelButton pending={state.unspentStatPoints || 0} onClick={() => setStatModalOpen(true)} />
         <StatUpgradeModal open={statModalOpen} state={state} onPick={pickStat} onClose={() => setStatModalOpen(false)} />
 
         <IntroOverlay

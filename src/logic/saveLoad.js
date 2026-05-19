@@ -29,6 +29,8 @@ export function loadGame() {
       state: {
         ...state,
         combatTarget: state.combatTarget ?? null,
+        harvestTarget: state.harvestTarget ?? null,
+        tileHp: state.tileHp ?? {},
         characterXp: state.characterXp ?? 0,
         characterLevel: state.characterLevel ?? 1,
         unspentStatPoints: state.unspentStatPoints ?? 0,

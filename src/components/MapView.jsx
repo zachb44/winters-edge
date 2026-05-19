@@ -8,6 +8,7 @@ import { visibilityAt } from '../logic/visibility.js';
 import { PredatorAlert } from './PredatorAlert.jsx';
 import { FloatingDamage } from './FloatingDamage.jsx';
 import { CombatOverlay } from './CombatOverlay.jsx';
+import { HarvestHpBars } from './HarvestHpBars.jsx';
 
 export function MapView({
   state, map, view, fog, mapScale,
@@ -18,8 +19,9 @@ export function MapView({
 }) {
   const now = Date.now();
   const target = state.combatTarget != null ? state.animals.find(a => a.id === state.combatTarget) : null;
-  const playerLungeOff = (state.player.lungeUntil > now && target)
-    ? { dx: Math.sign(target.x - state.player.x) * 4, dy: Math.sign(target.y - state.player.y) * 4 }
+  const lungeAimAt = target || state.harvestTarget || null;
+  const playerLungeOff = (state.player.lungeUntil > now && lungeAimAt)
+    ? { dx: Math.sign(lungeAimAt.x - state.player.x) * 4, dy: Math.sign(lungeAimAt.y - state.player.y) * 4 }
     : { dx: 0, dy: 0 };
   let skyColor = 'rgba(0,0,0,0)';
   if (state.time < 5) skyColor = 'rgba(15, 25, 55, 0.6)';
@@ -266,6 +268,7 @@ export function MapView({
         })}
 
         <CombatOverlay combatTarget={state.combatTarget} animals={state.animals} player={state.player} view={view} />
+        <HarvestHpBars tileHp={state.tileHp} map={map} view={view} />
         <FloatingDamage items={damageNumbers} view={view} />
         <PredatorAlert predator={nearbyPredator} />
 

@@ -5,6 +5,7 @@ import { PROFESSIONS } from '../data/professions.js';
 import { rollDailyEvent } from '../data/events.js';
 import { newAnimalId } from '../logic/animals.js';
 import { applyAttack } from '../logic/combat.js';
+import { applyHarvest } from '../logic/harvest.js';
 import { applyXp, XP_REWARDS } from '../data/leveling.js';
 import {
   ANIMAL_ATTACK_SPEED,
@@ -13,6 +14,7 @@ import {
   computePlayerAttackSpeed,
   computePlayerRange,
 } from '../data/combat.js';
+import { HARVEST_SWING_MS, HARVEST_STAMINA_FLOOR, HARVEST_RANGE } from '../data/harvest.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -225,7 +227,9 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         const now = Date.now();
         const isFirstNight = (s.day === 1 && s.time >= 18) || (s.day === 2 && s.time < 6);
 
-        // Player auto-attack against the engaged target
+        // Unified player swing engine — drives combat OR harvest from the
+        // same lastAttackMs timer + lunge. Player can only engage one at
+        // a time; the click router enforces mutual exclusion.
         if (s.combatTarget !== null) {
           const target = s.animals.find(a => a.id === s.combatTarget);
           if (!target || target.hp <= 0) {
@@ -244,6 +248,39 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               }
             }
           }
+        } else if (s.harvestTarget) {
+          const ht = s.harvestTarget;
+          // Validate the tile is still a tree/rock (someone else might have
+          // chopped it via an event — defensive).
+          const stillThere = map[ht.y]?.[ht.x] === ht.tile;
+          if (!stillThere) {
+            s.harvestTarget = null;
+          } else {
+            const td = Math.abs(ht.x - s.player.x) + Math.abs(ht.y - s.player.y);
+            if (td <= HARVEST_RANGE
+                && s.player.stamina >= HARVEST_STAMINA_FLOOR
+                && now - (s.player.lastAttackMs || 0) >= HARVEST_SWING_MS) {
+              const result = applyHarvest(s);
+              s = result.state;
+              if (result.hit) {
+                s.player = { ...s.player, lastAttackMs: now, lungeUntil: now + 200 };
+                if (onPlayerSwing) onPlayerSwing({ dmg: result.hit.dmg, lethal: result.hit.completed, x: result.hit.x, y: result.hit.y });
+                if (result.hit.completed) {
+                  // Side effect: swap the map tile to SNOW. Trees also register
+                  // for the existing regrowth system.
+                  const cx = result.hit.x, cy = result.hit.y;
+                  setMap(m => {
+                    const nm = m.map(r => [...r]);
+                    if (nm[cy]) nm[cy][cx] = T.SNOW;
+                    return nm;
+                  });
+                  if (result.hit.tile === T.TREE) {
+                    s.trees = { ...s.trees, [`${cx},${cy}`]: 6 };
+                  }
+                }
+              }
+            }
+          }
         }
 
         // Animal attacks (per-animal timers)
@@ -254,7 +291,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           if (!attackMs) return a;
           const d = Math.abs(a.x - s.player.x) + Math.abs(a.y - s.player.y);
           if (d > 1) return a;
-          if (a.type === 'wolf' && !(isNight || s.eventEffects.extraWolfAggression)) return a;
+          // Wolves attack adjacent player regardless of day/night now.
+          // Boars need aggro (set by proximity in the movement block).
           if (a.type === 'boar' && !a.aggro) return a;
           if (now - (a.lastAttackMs || 0) < attackMs) return a;
           const baseDmg = a.type === 'wolf' ? 8 : a.type === 'boar' ? 12 : 20;
@@ -280,12 +318,31 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             const dy = s.player.y - a.y;
             const dist = Math.abs(dx) + Math.abs(dy);
 
-            if (a.type === 'wolf' && (isNight || s.eventEffects.extraWolfAggression) && dist < (s.eventEffects.extraWolfAggression ? 10 : 8)) {
-              if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
-              else ny += Math.sign(dy);
-            } else if (a.type === 'boar' && a.aggro && dist < 6) {
-              if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
-              else ny += Math.sign(dy);
+            if (a.type === 'wolf') {
+              // Day: chase if within 4 tiles. Night / wolf-pack event: out to 8 / 10.
+              const wolfRange = s.eventEffects.extraWolfAggression
+                ? 10
+                : (isNight ? 8 : 4);
+              if (dist < wolfRange) {
+                if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
+                else ny += Math.sign(dy);
+              }
+            } else if (a.type === 'boar') {
+              // Boars wake up via proximity (sticky). Once aggro'd, chase out to 6.
+              const wakeNow = !a.aggro && dist <= 3;
+              const aggro = a.aggro || wakeNow;
+              if (aggro && dist < 6) {
+                if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
+                else ny += Math.sign(dy);
+              }
+              if (wakeNow) {
+                nx = Math.max(0, Math.min(MAP_W - 1, nx));
+                ny = Math.max(0, Math.min(MAP_H - 1, ny));
+                if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
+                  return { ...a, x: nx, y: ny, aggro: true };
+                }
+                return { ...a, aggro: true };
+              }
             } else if (a.type === 'bear') {
               if (dist < 5) {
                 if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);

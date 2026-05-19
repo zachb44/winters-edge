@@ -2,8 +2,9 @@ import React from 'react';
 import { PROFESSIONS } from '../data/professions.js';
 import { Vital } from './shared/Vital.jsx';
 import { levelProgress } from '../data/leveling.js';
+import { LevelButton } from './LevelButton.jsx';
 
-export function GameUI({ state, setState, onSaveAndQuit }) {
+export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
   const isNight = state.time < 6 || state.time > 19;
   const timeStr = `${Math.floor(state.time).toString().padStart(2, '0')}:${Math.floor((state.time % 1) * 60).toString().padStart(2, '0')}`;
   const towerProgress = state.scenario === 'tower' ? {
@@ -24,6 +25,7 @@ export function GameUI({ state, setState, onSaveAndQuit }) {
             <div className="h-full bg-amber-400" style={{ width: `${levelProgress(state).pct * 100}%` }}></div>
           </div>
         </div>
+        <LevelButton pending={state.unspentStatPoints || 0} onClick={onOpenStatModal} />
         <div>Day <span className="text-white font-bold">{state.day}</span>{state.scenario === 'rescue' ? '/30' : ''}</div>
         <div>{timeStr} {isNight ? '🌙' : '☀️'}</div>
         <div>

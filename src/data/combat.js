@@ -1,17 +1,17 @@
 // Combat tuning constants. All times in milliseconds. Pure data — no React.
 // `attackSpeed` = ms between swings. Lower = faster.
 
-export const PLAYER_ATTACK_BASE_MS = 1500;
+export const PLAYER_ATTACK_BASE_MS = 1000;
 export const WEAPON_ATTACK_MS = {
-  rifle: 1800,
-  hunting_bow: 1100,
-  hatchet: 1300,
+  rifle: 1300,
+  hunting_bow: 750,
+  hatchet: 850,
 };
 
 export const ANIMAL_ATTACK_SPEED = {
-  wolf: 1200,
-  boar: 1800,
-  bear: 2000,
+  wolf: 1000,
+  boar: 1500,
+  bear: 1700,
 };
 
 export const ENGAGEMENT_RANGE = {

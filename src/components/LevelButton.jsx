@@ -1,16 +1,26 @@
 import React from 'react';
 
-// Persistent button in the top-right when the player has unspent
-// stat points. Pulses gently to draw attention. Shows the count
-// as "(×N)" when more than one is pending.
+// Inline top-bar button shown when the player has unspent stat points.
+// Styled to match the slate Pause/Speed buttons with a gold accent +
+// soft 2-second pulse so it invites a click without being frantic.
+// Hidden when there's nothing to spend.
 export function LevelButton({ pending, onClick }) {
   if (!pending || pending <= 0) return null;
   return (
-    <button
-      onClick={onClick}
-      className="fixed top-2 right-2 z-30 bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg text-xs font-bold animate-pulse shadow-lg shadow-amber-500/40 border border-amber-300"
-    >
-      ⭐ Level Up Available{pending > 1 ? ` (×${pending})` : ''} — choose a stat
-    </button>
+    <>
+      <button
+        onClick={onClick}
+        className="bg-slate-700 hover:bg-slate-600 text-amber-300 border border-amber-600/40 px-2 py-1 rounded text-xs font-bold"
+        style={{ animation: 'levelButtonPulse 2s ease-in-out infinite' }}
+      >
+        ⭐ Lv Up{pending > 1 ? ` ×${pending}` : ''} — Choose
+      </button>
+      <style>{`
+        @keyframes levelButtonPulse {
+          0%, 100% { box-shadow: 0 0 0 rgba(251, 191, 36, 0); }
+          50%      { box-shadow: 0 0 12px rgba(251, 191, 36, 0.55); }
+        }
+      `}</style>
+    </>
   );
 }
