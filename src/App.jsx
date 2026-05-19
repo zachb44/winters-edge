@@ -287,6 +287,29 @@ const PROFESSIONS = {
   },
 };
 
+const SAVE_KEY = 'wintersedge.save.v1';
+
+function saveGame(state, map, fog) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ts: Date.now(), state, map, fog }));
+  } catch (e) {
+    console.warn('Save failed:', e);
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch {}
+}
+
 const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
   const prof = PROFESSIONS[profession];
   const baseInv = {
@@ -349,6 +372,7 @@ export default function WintersEdge() {
   const [playerBob, setPlayerBob] = useState(0);
   const [footprints, setFootprints] = useState([]);
   const [mapScale, setMapScale] = useState(1);
+  const [hasSavedGame, setHasSavedGame] = useState(() => !!loadGame());
   const tickRef = useRef(0);
 
   useEffect(() => {
@@ -374,6 +398,9 @@ export default function WintersEdge() {
       { type: 'rabbit', x: 42, y: 8, hp: 10, hostile: false },
       { type: 'rabbit', x: 20, y: 28, hp: 10, hostile: false },
       { type: 'rabbit', x: 50, y: 18, hp: 10, hostile: false },
+      { type: 'rabbit', x: 35, y: 25, hp: 10, hostile: false },
+      { type: 'rabbit', x: 25, y: 15, hp: 10, hostile: false },
+      { type: 'rabbit', x: 15, y: 32, hp: 10, hostile: false },
       { type: 'deer', x: 48, y: 6, hp: 20, hostile: false },
       { type: 'deer', x: 52, y: 11, hp: 20, hostile: false },
       { type: 'wolf', x: 52, y: 25, hp: 25, hostile: true },
@@ -402,6 +429,23 @@ export default function WintersEdge() {
     setFog(Array(MAP_H).fill(null).map(() => Array(MAP_W).fill(false)));
     tickRef.current = 0;
     setGameStarted(true);
+  };
+
+  const continueGame = () => {
+    const save = loadGame();
+    if (!save) return;
+    setMap(save.map);
+    setState({ ...save.state, paused: true });
+    setFog(save.fog);
+    tickRef.current = 0;
+    setGameStarted(true);
+  };
+
+  const saveAndQuit = () => {
+    saveGame(state, map, fog);
+    setHasSavedGame(true);
+    setGameStarted(false);
+    setSetupStep('scenario');
   };
 
   useEffect(() => {
@@ -485,6 +529,40 @@ export default function WintersEdge() {
     if (!gameStarted) return;
     setFootprints(prev => [...prev, { x: state.player.x, y: state.player.y, ts: Date.now() }].slice(-20));
   }, [state.player.x, state.player.y, gameStarted]);
+
+  // Autosave: latest snapshot held in a ref so the 30s interval doesn't restart
+  const saveSnapshotRef = useRef({ state, map, fog });
+  useEffect(() => { saveSnapshotRef.current = { state, map, fog }; });
+
+  // Autosave every 30 seconds
+  useEffect(() => {
+    if (!gameStarted) return;
+    const id = setInterval(() => {
+      const snap = saveSnapshotRef.current;
+      if (snap.state.dead || snap.state.rescued) return;
+      saveGame(snap.state, snap.map, snap.fog);
+      setHasSavedGame(true);
+    }, 30000);
+    return () => clearInterval(id);
+  }, [gameStarted]);
+
+  // Save on day change
+  useEffect(() => {
+    if (!gameStarted) return;
+    saveGame(state, map, fog);
+    setHasSavedGame(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.day]);
+
+  // Save on death / rescue
+  useEffect(() => {
+    if (!gameStarted) return;
+    if (state.dead || state.rescued) {
+      saveGame(state, map, fog);
+      setHasSavedGame(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.dead, state.rescued]);
 
   // Main tick
   useEffect(() => {
@@ -579,6 +657,7 @@ export default function WintersEdge() {
         if (s.equipment.hasCoat) warmthDelta += 0.2;
         if (s.inventory.fur_coat > 0) warmthDelta += 0.3;
         if (prof.mods.warmthRetention && warmthDelta < 0) warmthDelta *= prof.mods.warmthRetention;
+        if (s.day <= 3 && warmthDelta < 0) warmthDelta *= 0.8;
         s.player.warmth = Math.max(0, Math.min(100, s.player.warmth + warmthDelta));
 
         const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1);
@@ -795,7 +874,8 @@ export default function WintersEdge() {
 
       if (tile === T.TREE) {
         const woodBonus = prof.mods.woodBonus || 1;
-        const amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus);
+        const earlyBonus = s.day <= 3 ? 1 : 0;
+        const amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus) + earlyBonus;
         s.inventory.wood += amount;
         s.skills.foragingXp += 5;
         if (s.skills.foragingXp >= s.skills.foraging * 30) {
@@ -1125,6 +1205,18 @@ export default function WintersEdge() {
               <h1 className="text-3xl font-bold text-sky-300">Winter's Edge</h1>
               <p className="text-slate-400 mt-2">A survival game in a frozen wilderness</p>
             </div>
+            {hasSavedGame && (
+              <div className="mb-6">
+                <button onClick={continueGame}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-lg">
+                  ▶ Continue Saved Game
+                </button>
+                <button onClick={() => { clearSave(); setHasSavedGame(false); }}
+                  className="w-full mt-1 text-xs text-slate-400 hover:text-slate-200">
+                  Delete saved game
+                </button>
+              </div>
+            )}
             <div className="space-y-3 mb-6">
               <h2 className="text-lg font-bold text-slate-300">Step 1 of 2 — Choose Your Scenario</h2>
               {Object.entries(SCENARIOS).map(([key, sc]) => (
@@ -1268,6 +1360,9 @@ export default function WintersEdge() {
               </button>
             ))}
           </div>
+          <button onClick={saveAndQuit} className="bg-emerald-700 hover:bg-emerald-600 px-2 py-1 rounded text-xs">
+            💾 Save &amp; Quit
+          </button>
         </div>
 
         <div className="bg-slate-800 px-2 py-1 flex flex-wrap gap-2 text-xs border-b border-slate-700 flex-shrink-0">
@@ -1400,16 +1495,6 @@ export default function WintersEdge() {
                 <div key={`b-${i}`}>
                   {isLitFire && vis === 2 && (
                     <div className="absolute pointer-events-none" style={{
-                      left: (b.x - view.x) * TILE - TILE * 2,
-                      top: (b.y - view.y) * TILE - TILE * 2,
-                      width: TILE * 5, height: TILE * 5,
-                      background: 'radial-gradient(circle, rgba(255,160,60,0.35) 0%, rgba(255,140,40,0.18) 30%, rgba(255,120,40,0) 70%)',
-                      mixBlendMode: 'screen',
-                      animation: 'glowPulse 2s ease-in-out infinite',
-                    }} />
-                  )}
-                  {isLitFire && vis === 2 && (
-                    <div className="absolute pointer-events-none" style={{
                       left: (b.x - view.x) * TILE + TILE/2 - 4,
                       top: (b.y - view.y) * TILE - 8,
                       width: 8, height: 16,
@@ -1509,6 +1594,23 @@ export default function WintersEdge() {
 
             <div className="absolute inset-0 pointer-events-none" style={{ background: skyColor }}></div>
             <div className="absolute inset-0 pointer-events-none" style={{ background: weatherOverlay }}></div>
+
+            {state.buildings.filter(b => b.type === 'campfire' && b.fuel > 0
+                && b.x >= view.x - 8 && b.x < view.x + VIEW_W + 8
+                && b.y >= view.y - 8 && b.y < view.y + VIEW_H + 8).map((b, i) => {
+              const vis = visibilityAt(fog, state.player.x, state.player.y, b.x, b.y);
+              if (vis === 0) return null;
+              return (
+                <div key={`glow-${i}`} className="absolute pointer-events-none" style={{
+                  left: (b.x - view.x) * TILE + TILE / 2 - TILE * 8,
+                  top: (b.y - view.y) * TILE + TILE / 2 - TILE * 8,
+                  width: TILE * 16, height: TILE * 16,
+                  background: 'radial-gradient(circle, rgba(255,190,90,0.75) 0%, rgba(255,150,55,0.5) 20%, rgba(255,120,40,0.22) 45%, rgba(255,90,30,0.06) 70%, rgba(255,80,30,0) 90%)',
+                  animation: 'glowPulse 2s ease-in-out infinite',
+                  opacity: vis === 2 ? 1 : 0.5,
+                }} />
+              );
+            })}
           </div>
           </div>
 
@@ -1624,7 +1726,7 @@ export default function WintersEdge() {
                 {state.player.name} the {PROFESSIONS[state.profession].name}<br/>
                 {state.rescued ? `Made it on day ${state.day}.` : `Survived ${state.day} days.`}
               </div>
-              <button onClick={() => { setGameStarted(false); setSetupStep('scenario'); }} className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded">
+              <button onClick={() => { clearSave(); setHasSavedGame(false); setGameStarted(false); setSetupStep('scenario'); }} className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded">
                 New Game
               </button>
             </div>
