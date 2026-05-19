@@ -359,6 +359,9 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
     pendingCarcass: null,
     pendingTraveler: null,
     lootCounts: {},
+    showIntro: true,
+    crashSiteName: '',
+    deathCause: null,
   };
 };
 
@@ -391,6 +394,8 @@ export default function WintersEdge() {
   const [playerBob, setPlayerBob] = useState(0);
   const [footprints, setFootprints] = useState([]);
   const [mapScale, setMapScale] = useState(1);
+  const [dayBanner, setDayBanner] = useState(null);
+  const [tooltipReady, setTooltipReady] = useState(false);
   const [savedGameMeta, setSavedGameMeta] = useState(() => {
     const s = loadGame();
     return s ? { day: s.state.day, profession: s.state.profession } : null;
@@ -452,6 +457,8 @@ export default function WintersEdge() {
     const finalName = name && name.trim() ? name.trim() : 'Survivor';
     const fresh = initialState(scenario, { x: md.startX, y: md.startY }, profession, finalName);
     fresh.animals = spawnInitialAnimals();
+    fresh.crashSiteName = md.siteName;
+    fresh.showIntro = true;
     fresh.log = [
       { msg: `Crash site: ${md.siteName}.`, day: 1, time: 8 },
       { msg: `${finalName} the ${PROFESSIONS[profession].name} wakes in the wreckage. Cold. Alone.`, day: 1, time: 8 },
@@ -466,7 +473,7 @@ export default function WintersEdge() {
     const save = loadGame();
     if (!save) return;
     setMap(save.map);
-    setState({ ...save.state, paused: true });
+    setState({ ...save.state, paused: true, showIntro: false });
     setFog(save.fog);
     tickRef.current = 0;
     setGameStarted(true);
@@ -584,6 +591,22 @@ export default function WintersEdge() {
     refreshSavedMeta(state);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.day]);
+
+  // Day-change banner (skip day 1 — that's covered by the intro)
+  useEffect(() => {
+    if (!gameStarted || state.day < 2 || state.showIntro) return;
+    setDayBanner({ day: state.day, event: state.currentEvent?.name || '' });
+    const t = setTimeout(() => setDayBanner(null), 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.day]);
+
+  // Hover tooltip delay (300ms after entering a tile)
+  useEffect(() => {
+    if (!hover) { setTooltipReady(false); return; }
+    const t = setTimeout(() => setTooltipReady(true), 300);
+    return () => clearTimeout(t);
+  }, [hover]);
 
   // Save on death / rescue
   useEffect(() => {
@@ -717,8 +740,14 @@ export default function WintersEdge() {
         const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1) * TIME_SCALE;
         s.player.hunger = Math.max(0, s.player.hunger - hungerDrain);
         if (!moveTarget) s.player.stamina = Math.min(100, s.player.stamina + 0.5);
-        if (s.player.warmth < 20) s.player.hp = Math.max(0, s.player.hp - 0.5 * TIME_SCALE);
-        if (s.player.hunger < 15) s.player.hp = Math.max(0, s.player.hp - 0.3 * TIME_SCALE);
+        if (s.player.warmth < 20) {
+          s.player.hp = Math.max(0, s.player.hp - 0.5 * TIME_SCALE);
+          if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'You froze to death.';
+        }
+        if (s.player.hunger < 15) {
+          s.player.hp = Math.max(0, s.player.hp - 0.3 * TIME_SCALE);
+          if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'You starved.';
+        }
         const regenThreshold = s.eventEffects.thaw ? 50 : 60;
         if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp < 100) {
           let regenAmount = s.eventEffects.thaw ? 0.4 : 0.2;
@@ -793,14 +822,16 @@ export default function WintersEdge() {
             const dy = s.player.y - a.y;
             const dist = Math.abs(dx) + Math.abs(dy);
 
+            const isFirstNight = (s.day === 1 && s.time >= 18) || (s.day === 2 && s.time < 6);
             if (a.type === 'wolf' && (isNight || s.eventEffects.extraWolfAggression) && dist < (s.eventEffects.extraWolfAggression ? 10 : 8)) {
               if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
               else ny += Math.sign(dy);
-              if (dist <= 1) {
+              if (dist <= 1 && !isFirstNight) {
                 const baseDmg = 8;
                 const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
                 s.player.hp = Math.max(0, s.player.hp - dmgTaken);
                 s = addLog(s, '🐺 A wolf attacks!');
+                if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'Killed by a wolf.';
               }
             } else if (a.type === 'boar' && a.aggro && dist < 6) {
               if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
@@ -810,16 +841,18 @@ export default function WintersEdge() {
                 const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
                 s.player.hp = Math.max(0, s.player.hp - dmgTaken);
                 s = addLog(s, '🐗 A boar gores you!');
+                if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'Gored by a boar.';
               }
             } else if (a.type === 'bear') {
               if (dist < 5) {
                 if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
                 else ny += Math.sign(dy);
-                if (dist <= 1) {
+                if (dist <= 1 && !isFirstNight) {
                   const baseDmg = 20;
                   const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
                   s.player.hp = Math.max(0, s.player.hp - dmgTaken);
                   s = addLog(s, '🐻 THE BEAR MAULS YOU!');
+                  if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'The bear got you.';
                 }
               } else {
                 const hdx = a.homeX - a.x, hdy = a.homeY - a.y;
@@ -1362,6 +1395,14 @@ export default function WintersEdge() {
   const isNight = state.time < 6 || state.time > 19;
   const timeStr = `${Math.floor(state.time).toString().padStart(2, '0')}:${Math.floor((state.time % 1) * 60).toString().padStart(2, '0')}`;
 
+  let nearbyPredator = null;
+  for (const a of state.animals) {
+    if (a.hp <= 0) continue;
+    const d = Math.abs(a.x - state.player.x) + Math.abs(a.y - state.player.y);
+    if (a.type === 'bear' && d <= 4) { nearbyPredator = 'bear'; break; }
+    if (a.type === 'wolf' && d <= 4 && isNight && nearbyPredator !== 'bear') nearbyPredator = 'wolf';
+  }
+
   let skyColor = 'rgba(0,0,0,0)';
   if (state.time < 5) skyColor = 'rgba(15, 25, 55, 0.6)';
   else if (state.time < 6) skyColor = 'rgba(60, 50, 90, 0.4)';
@@ -1422,9 +1463,14 @@ export default function WintersEdge() {
         </div>
 
         <div className="bg-slate-800 px-2 py-1 flex flex-wrap gap-2 text-xs border-b border-slate-700 flex-shrink-0">
-          <Vital label="❤️ HP" value={state.player.hp} color="bg-red-500" />
-          <Vital label="🔥 Warmth" value={state.player.warmth} color="bg-orange-400" warning={state.player.warmth < 30} />
-          <Vital label="🍖 Hunger" value={state.player.hunger} color="bg-yellow-600" warning={state.player.hunger < 25} />
+          <Vital label="❤️ HP" value={state.player.hp} color="bg-red-500"
+                 criticalLabel={state.player.hp < 30 ? '⚠️ INJURED' : null} />
+          <Vital label="🔥 Warmth" value={state.player.warmth} color="bg-orange-400"
+                 warning={state.player.warmth < 35}
+                 criticalLabel={state.player.warmth < 25 ? '⚠️ FREEZING' : null} />
+          <Vital label="🍖 Hunger" value={state.player.hunger} color="bg-yellow-600"
+                 warning={state.player.hunger < 30}
+                 criticalLabel={state.player.hunger < 20 ? '⚠️ STARVING' : null} />
           <Vital label="⚡ Stamina" value={state.player.stamina} color="bg-green-500" />
         </div>
 
@@ -1672,6 +1718,51 @@ export default function WintersEdge() {
                 }} />
               );
             })}
+
+            {nearbyPredator && (
+              <div className="absolute top-2 right-2 pointer-events-none">
+                {nearbyPredator === 'bear' ? (
+                  <div className="bg-red-900/90 border-2 border-red-500 rounded px-3 py-2 text-sm font-bold text-red-100 animate-pulse shadow-lg shadow-red-500/50">
+                    <span className="text-2xl mr-1">🐻</span> BEAR NEARBY — RUN
+                  </div>
+                ) : (
+                  <div className="bg-red-900/80 border border-red-600 rounded px-2 py-1 text-xs font-bold text-red-200 shadow-lg shadow-red-500/30">
+                    🐺 Wolf nearby!
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tooltipReady && hover && (() => {
+              const tile = map[hover.y] && map[hover.y][hover.x];
+              if (tile === undefined) return null;
+              const key = `${hover.x},${hover.y}`;
+              const lc = state.lootCounts || {};
+              const remaining = key in lc ? lc[key] : LOOT_BUDGET[tile];
+              let text = null;
+              if (tile === T.TREE) text = '🌲 Tree — Click to chop for wood';
+              else if (tile === T.ROCK) text = '🪨 Rock — Click to mine for stone';
+              else if (tile === T.PLANE) text = remaining > 0 ? `✈️ Plane Wreckage — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
+              else if (tile === T.CABIN) text = remaining > 0 ? `🏚️ Abandoned Cabin — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
+              else if (tile === T.CAVE) text = '🕳️ Cave — Walkable shelter';
+              else if (tile === T.TOWER) text = '📡 Radio Tower — Reach with 10 food, 5 wood, coat to win';
+              if (!text) return null;
+              const left = (hover.x - view.x) * TILE + TILE + 4;
+              const top = (hover.y - view.y) * TILE - 4;
+              const right = left + 220 > VIEW_W * TILE;
+              return (
+                <div className="absolute pointer-events-none z-30" style={{
+                  left: right ? undefined : left,
+                  right: right ? VIEW_W * TILE - ((hover.x - view.x) * TILE) + 4 : undefined,
+                  top,
+                  maxWidth: 220,
+                }}>
+                  <div className="bg-slate-900/95 border border-slate-600 rounded px-2 py-1 text-xs text-slate-100 shadow-lg whitespace-nowrap">
+                    {text}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           </div>
 
@@ -1778,11 +1869,51 @@ export default function WintersEdge() {
           </div>
         )}
 
+        {dayBanner && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
+            <div className="bg-black/60 backdrop-blur-sm border border-amber-700/50 rounded-lg px-10 py-6 text-center animate-pulse">
+              <div className="text-5xl font-bold text-amber-300 tracking-widest">DAY {dayBanner.day}</div>
+              {dayBanner.event && <div className="text-slate-300 italic text-sm mt-2">{dayBanner.event}</div>}
+            </div>
+          </div>
+        )}
+
+        {state.showIntro && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-slate-900/95 border-2 border-amber-700/60 rounded-lg shadow-2xl max-w-lg w-[90%] p-6">
+              <div className="text-center mb-4">
+                <div className="text-3xl mb-1">{PROFESSIONS[state.profession].playerEmoji}</div>
+                <div className="text-amber-400/80 text-xs tracking-widest uppercase">Day 1 · {state.crashSiteName}</div>
+              </div>
+              <p className="text-slate-200 italic text-base leading-relaxed mb-5 text-center">
+                The plane went down at dawn. {state.player.name} the {PROFESSIONS[state.profession].name} crawls from the wreckage — alive, cold, alone.
+                {' '}
+                {state.scenario === 'rescue'
+                  ? 'Thirty days until rescue. Maybe.'
+                  : 'The radio tower is the only way out. Reach it before the cold takes you.'}
+              </p>
+              <div className="bg-slate-800/60 border border-slate-700 rounded p-3 mb-5 text-xs space-y-1 text-slate-300">
+                <div>🖱️ Click tiles to move and interact</div>
+                <div>🔥 Build a campfire FAST — warmth kills you quickly</div>
+                <div>⛺ Build a tent so you can sleep through the night</div>
+              </div>
+              <button
+                onClick={() => setState(s => ({ ...s, showIntro: false, paused: false }))}
+                className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-lg font-bold text-lg">
+                Begin
+              </button>
+            </div>
+          </div>
+        )}
+
         {(state.dead || state.rescued) && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
             <div className="bg-slate-800 p-8 rounded-lg border border-slate-600 text-center max-w-md">
               <div className="text-4xl mb-3">{state.rescued ? (state.scenario === 'tower' ? '📡' : '🚁') : '💀'}</div>
               <div className="text-2xl font-bold mb-2">{state.rescued ? 'SURVIVED' : 'YOU DIED'}</div>
+              {state.dead && state.deathCause && (
+                <div className="text-red-300 italic text-sm mb-2">{state.deathCause}</div>
+              )}
               <div className="text-slate-300 mb-4">
                 {state.player.name} the {PROFESSIONS[state.profession].name}<br/>
                 {state.rescued ? `Made it on day ${state.day}.` : `Survived ${state.day} days.`}
@@ -1798,11 +1929,16 @@ export default function WintersEdge() {
   );
 }
 
-function Vital({ label, value, color, warning }) {
+function Vital({ label, value, color, warning, criticalLabel }) {
+  const critical = !!criticalLabel;
   return (
-    <div className={`flex-1 min-w-32 ${warning ? 'animate-pulse' : ''}`}>
+    <div className={`flex-1 min-w-32 ${critical ? 'p-1 -m-1 rounded ring-2 ring-red-500/70 animate-pulse' : warning ? 'animate-pulse' : ''}`}>
       <div className="flex justify-between text-xs mb-0.5">
-        <span>{label}</span><span>{Math.floor(value)}</span>
+        <span>{label}</span>
+        <span className="flex items-center gap-1">
+          {critical && <span className="text-red-300 text-[10px] font-bold">{criticalLabel}</span>}
+          <span>{Math.floor(value)}</span>
+        </span>
       </div>
       <div className="h-2 bg-slate-700 rounded overflow-hidden">
         <div className={`h-full ${color} transition-all`} style={{ width: `${value}%` }}></div>
