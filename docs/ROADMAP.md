@@ -24,7 +24,7 @@ The game is **demo-ready**. Shippable single-player prototype with:
 ### Combat
 - **Auto-attack engagement** — click target, swings happen on attack-speed timer
 - Player baseline 1000ms, faster with weapons (hatchet 850ms, bow 750ms, rifle 1300ms)
-- Animal AI with per-creature attack speeds
+- Animal AI with per-creature attack speeds (properly throttled — see bug fix 829095e)
 - Floating damage numbers, lunge animation, hit flashes, screen shake
 - HP bar over engaged targets
 - Combat target tracking by stable animal ID
@@ -87,9 +87,23 @@ The game is **demo-ready**. Shippable single-player prototype with:
 
 These are the next prompts that can be pasted into Claude Code. See `docs/prompts/queued/` for full prompt text.
 
-### Near-term (next 1-3 sessions)
+### Priority 1 — Outbreak Mode core (next 3-5 sessions)
 
-1. **Profession abilities** — active skills tied to class, unlocked at levels 3/5/7
+This is the critical path. Everything else waits until Outbreak Mode is playable.
+
+1. **Mode selection screen** — Update character creation to add Mode → Scenario two-step selection. Wilderness Mode uses existing systems unchanged. Outbreak Mode sets reduced hunger/warmth drain rates and enables zombie spawning.
+
+2. **Basic zombie enemy (shambler)** — First zombie type. Slow, predictable, moderate HP. Spawns at map edges at sundown. Uses existing combat system (auto-attack engagement). Distinct from animals in appearance and behavior.
+
+3. **Wave system + night counter** — Zombie count scales with night number. Night 1 = small group, Night 30 = horde. Day banner changes to "NIGHT N" format at sundown. Win condition becomes "Survive 30 nights" in Outbreak Mode.
+
+4. **Military outpost zone** — Add the outpost area to the map. Multiple buildings, sandbag walls, watchtower, armory. Near the crash site in Outbreak Mode. Justifies weapon/ammo abundance. Environmental storytelling (bullet holes, abandoned tents, half-built barricades).
+
+5. **Map expansion to 120×90** — 4× the area. Add all 8 named base locations (Military Outpost, Hangar, Tree Crescent, Cave System, Frozen Lake Cabin, Boulder Maze, Hilltop, Crash Site). Cave expands to ~5×4 interior with 1-2 entrances.
+
+### Priority 2 — Gameplay depth (next 3-6 sessions after P1)
+
+6. **Profession abilities** — Active skills tied to class, unlocked at levels 3/5/7
    - Lumberjack: Power Chop, Hardy, Stockpile
    - Hunter: Track, Aimed Shot, Skin Master
    - Mechanic: Salvage, Jury-Rig, Lucky Find
@@ -97,25 +111,36 @@ These are the next prompts that can be pasted into Claude Code. See `docs/prompt
    - Prospector: Power Mine, Cold Forged, Earth Sense
    - Veteran: Battle Cry, Iron Will, Execute
 
-2. **Mission A — D2-style bottom HUD** — orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
+7. **Outbreak events** — Replace/supplement cold-themed events with horde-themed ones in Outbreak Mode (big horde tonight, fast zombies, screamer spotted, weapon cache, ammo cache). Keep weather events.
 
-3. **Mission B — WC3 animated day/night dial** — circular SVG dial with filling segments and sun/moon morph
+8. **Defensive structures** — Barricades, reinforced walls, spike traps. Zombies attack structures. Structures have HP and can be repaired. Cost wood/stone.
 
-4. **Mission C — Workbench crafting hub** — click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.)
+### Priority 3 — HUD + UX overhaul (after P2)
 
-### Medium-term (3-6 sessions out)
+9. **Mission A — D2-style bottom HUD** — Orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
 
+10. **Mission B — WC3 animated day/night dial** — Circular SVG dial with filling segments and sun/moon morph
+
+11. **Mission C — Workbench crafting hub** — Click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.)
+
+### Priority 4 — Polish + expansion (medium-term)
+
+- Zombie variants (brute, runner, screamer)
+- Ammo as tracked resource (rifle uses bullets, bow uses arrows)
+- NPC survivors you can find and recruit
 - Smooth-scrolling camera (replace tile-snap with glide)
 - Sprite art swap (Kenney winter pack or commissioned)
 - Skill trees per profession (30+ nodes each)
-- Audio (ambient wind, footsteps, combat, wolf howls)
+- Audio (ambient wind, footsteps, combat, wolf howls, zombie groans)
 - Multiple biomes on larger map
 
 ### Long-term (6+ months out)
 
-- Itch.io release of v1 Winter's Edge
+- Itch.io release of v1 Winter's Edge (both modes)
 - Multiplayer prototype (Supabase integration)
 - Blood Moon mode as separate game (medieval werewolf survival)
+
+---
 
 ## Completed bundles
 
@@ -127,9 +152,15 @@ These are the next prompts that can be pasted into Claude Code. See `docs/prompt
 | Bundle 2 / Demo Polish | May 2026 | Intro overlay, vitals warnings, day banners, predator alerts, death cause, safe first night, tile tooltips |
 | Combat + Leveling | May 2026 | Auto-attack combat, character XP, level-ups, 4 stat upgrades |
 | Quick Wins | May 2026 | Faster combat speeds, multi-hit harvest, level-up button repositioned |
+| Bug Fix | May 2026 | Animal attack throttle — animals were attacking every 100ms tick instead of respecting attackSpeed. Split map assignment to fix stale-reference bug (commit 829095e) |
+| Pivot Docs | May 2026 | PIVOT.md created, VISION.md and ROADMAP.md updated to reflect two-mode design (Wilderness + Outbreak) |
+
+---
 
 ## Notes on cadence
 
 This is a part-time passion project. No deadlines. Bundles ship when they ship. Most weeks are 1-2 sessions.
 
 The discipline is: **finish what's started before adding new scope.** The hardest part of game dev is finishing.
+
+The pivot to two modes is NOT scope creep — it's scope clarification. Outbreak Mode reuses 90% of existing systems. The new work is zombies, waves, and map expansion. Everything else already works.
