@@ -156,7 +156,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'You starved.';
         }
         const regenThreshold = s.eventEffects.thaw ? 50 : 60;
-        if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp < 100) {
+        if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp > 0 && s.player.hp < 100) {
           let regenAmount = s.eventEffects.thaw ? 0.4 : 0.2;
           if (prof.mods.hpRegenBonus) regenAmount *= prof.mods.hpRegenBonus;
           s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + regenAmount * TIME_SCALE);
@@ -312,6 +312,16 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           return { ...a, lastAttackMs: now, lungeUntil: now + 200 };
         });
         s.animals = updatedAnimals;
+
+        // Immediate death check — animal damage above can drop hp to 0 in
+        // the same tick. Without this, death only catches on the next tick
+        // via the warmth/hunger check at the top, and the regen step can
+        // lift hp off 0 before that check sees it.
+        if (s.player.hp <= 0 && !s.dead) {
+          s.dead = true;
+          s = addLog(s, '💀 You have died.');
+          return s;
+        }
 
         // Animal movement (every 8 ticks). Animals engaged with the player
         // (player.combatTarget === a.id) stay locked in their tile.
