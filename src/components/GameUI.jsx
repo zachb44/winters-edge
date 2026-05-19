@@ -1,6 +1,7 @@
 import React from 'react';
 import { PROFESSIONS } from '../data/professions.js';
 import { Vital } from './shared/Vital.jsx';
+import { levelProgress } from '../data/leveling.js';
 
 export function GameUI({ state, setState, onSaveAndQuit }) {
   const isNight = state.time < 6 || state.time > 19;
@@ -16,7 +17,13 @@ export function GameUI({ state, setState, onSaveAndQuit }) {
   return (
     <>
       <div className="bg-slate-800 px-2 py-1 flex flex-wrap items-center gap-2 text-xs border-b border-slate-700 flex-shrink-0">
-        <div className="font-bold text-sky-300">❄️ {PROFESSIONS[state.profession].emoji} {state.player.name}</div>
+        <div className="font-bold text-sky-300 flex items-center gap-1">
+          ❄️ {PROFESSIONS[state.profession].emoji} {state.player.name}
+          <span className="text-amber-300 text-[10px] font-normal">(Lv {state.characterLevel || 1})</span>
+          <div className="w-12 h-0.5 bg-slate-700 rounded overflow-hidden ml-1">
+            <div className="h-full bg-amber-400" style={{ width: `${levelProgress(state).pct * 100}%` }}></div>
+          </div>
+        </div>
         <div>Day <span className="text-white font-bold">{state.day}</span>{state.scenario === 'rescue' ? '/30' : ''}</div>
         <div>{timeStr} {isNight ? '🌙' : '☀️'}</div>
         <div>

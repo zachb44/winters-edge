@@ -3,6 +3,16 @@ import { MAP_W, MAP_H, TIME_SCALE } from '../constants.js';
 import { T, TILE_DATA } from '../data/tiles.js';
 import { PROFESSIONS } from '../data/professions.js';
 import { rollDailyEvent } from '../data/events.js';
+import { newAnimalId } from '../logic/animals.js';
+import { applyAttack } from '../logic/combat.js';
+import { applyXp, XP_REWARDS } from '../data/leveling.js';
+import {
+  ANIMAL_ATTACK_SPEED,
+  STAMINA_COST_PER_SWING,
+  STAMINA_FLOOR_TO_SWING,
+  computePlayerAttackSpeed,
+  computePlayerRange,
+} from '../data/combat.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -10,7 +20,7 @@ import { rollDailyEvent } from '../data/events.js';
 //
 // Owns tickRef internally; returns { resetTick } so the caller can reset the
 // counter on startGame / continueGame.
-export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTarget, addLog }) {
+export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTarget, addLog, onPlayerSwing, onAnimalSwing }) {
   const tickRef = useRef(0);
 
   useEffect(() => {
@@ -27,6 +37,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           s.time = s.time - 24;
           s.day += 1;
           s = addLog(s, `--- Day ${s.day} ---`);
+          s = applyXp(s, XP_REWARDS.surviveDay);
           const event = rollDailyEvent(s.day);
           s.currentEvent = event;
           s.eventEffects = {};
@@ -39,7 +50,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
                 wy = Math.floor(Math.random() * MAP_H);
                 tries++;
               } while (tries < 30 && (!map[wy] || !TILE_DATA[map[wy][wx]].walkable || Math.abs(wx - s.player.x) + Math.abs(wy - s.player.y) < 8));
-              if (tries < 30) s.animals = [...s.animals, { type: 'wolf', x: wx, y: wy, hp: 25, hostile: true }];
+              if (tries < 30) s.animals = [...s.animals, { type: 'wolf', x: wx, y: wy, hp: 25, maxHp: 25, hostile: true, id: newAnimalId() }];
             }
             s.eventEffects.extraWolfAggression = true;
           } else if (event.id === 'cold_snap') s.eventEffects.coldSnap = true;
@@ -52,7 +63,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
                 dy = 3 + Math.floor(Math.random() * 13);
                 tries++;
               } while (tries < 20 && (!map[dy] || !TILE_DATA[map[dy][dx]].walkable));
-              if (tries < 20) s.animals = [...s.animals, { type: 'deer', x: dx, y: dy, hp: 20, hostile: false }];
+              if (tries < 20) s.animals = [...s.animals, { type: 'deer', x: dx, y: dy, hp: 20, maxHp: 20, hostile: false, id: newAnimalId() }];
             }
           } else if (event.id === 'crate_signal' || event.id === 'cache_rumor') {
             s.nextCrateDay = s.day;
@@ -87,7 +98,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           // Slow respawn at map edges (skips wolves/bears — they stay rare)
           if (s.day >= (s.nextRespawnDay ?? 5)) {
             const count = 1 + Math.floor(Math.random() * 2);
-            const stats = { rabbit: { hp: 10, hostile: false }, deer: { hp: 20, hostile: false }, raven: { hp: 5, hostile: false } };
+            const stats = { rabbit: { hp: 10, maxHp: 10, hostile: false }, deer: { hp: 20, maxHp: 20, hostile: false }, raven: { hp: 5, maxHp: 5, hostile: false } };
             for (let i = 0; i < count; i++) {
               const r = Math.random();
               const type = r < 0.5 ? 'rabbit' : r < 0.8 ? 'deer' : 'raven';
@@ -102,7 +113,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
                 if (map[sy] && TILE_DATA[map[sy][sx]].walkable && distToPlayer >= 10) ok = true;
                 tries++;
               }
-              if (ok) s.animals = [...s.animals, { type, x: sx, y: sy, ...stats[type] }];
+              if (ok) s.animals = [...s.animals, { type, x: sx, y: sy, ...stats[type], id: newAnimalId() }];
             }
             s.nextRespawnDay = s.day + 4 + Math.floor(Math.random() * 3);
           }
@@ -129,11 +140,11 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         if (s.inventory.fur_coat > 0) warmthDelta += 0.3;
         if (prof.mods.warmthRetention && warmthDelta < 0) warmthDelta *= prof.mods.warmthRetention;
         if (s.day <= 3 && warmthDelta < 0) warmthDelta *= 0.8;
-        s.player.warmth = Math.max(0, Math.min(100, s.player.warmth + warmthDelta * TIME_SCALE));
+        s.player.warmth = Math.max(0, Math.min(s.player.maxWarmth ?? 100, s.player.warmth + warmthDelta * TIME_SCALE));
 
         const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1) * TIME_SCALE;
         s.player.hunger = Math.max(0, s.player.hunger - hungerDrain);
-        if (!moveTarget) s.player.stamina = Math.min(100, s.player.stamina + 0.5);
+        if (!moveTarget) s.player.stamina = Math.min(s.player.maxStamina ?? 100, s.player.stamina + 0.5);
         if (s.player.warmth < 20) {
           s.player.hp = Math.max(0, s.player.hp - 0.5 * TIME_SCALE);
           if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'You froze to death.';
@@ -146,7 +157,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp < 100) {
           let regenAmount = s.eventEffects.thaw ? 0.4 : 0.2;
           if (prof.mods.hpRegenBonus) regenAmount *= prof.mods.hpRegenBonus;
-          s.player.hp = Math.min(100, s.player.hp + regenAmount * TIME_SCALE);
+          s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + regenAmount * TIME_SCALE);
         }
 
         if (s.player.hp <= 0) {
@@ -164,12 +175,14 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         }
 
         s.buildings = s.buildings.map(b => {
-          if (b.type === 'campfire' && b.fuel > 0) {
-            const newFuel = b.fuel - 0.05 * s.gameSpeed * TIME_SCALE;
-            if (newFuel <= 0 && b.fuel > 0) s = addLog(s, '🔥 Campfire went out.');
-            return { ...b, fuel: Math.max(0, newFuel) };
+          if (b.type !== 'campfire') return b;
+          if (b.fuel <= 0) return b;
+          const newFuel = b.fuel - 0.05 * s.gameSpeed * TIME_SCALE;
+          if (newFuel <= 0 && !b.wentOutLogged) {
+            s = addLog(s, '🔥 Campfire went out.');
+            return { ...b, fuel: 0, wentOutLogged: true };
           }
-          return b;
+          return { ...b, fuel: Math.max(0, newFuel) };
         });
 
         if (tickRef.current % 50 === 0) {
@@ -208,46 +221,75 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           }
         }
 
+        // ===== Combat: per-tick swing checks =====
+        const now = Date.now();
+        const isFirstNight = (s.day === 1 && s.time >= 18) || (s.day === 2 && s.time < 6);
+
+        // Player auto-attack against the engaged target
+        if (s.combatTarget !== null) {
+          const target = s.animals.find(a => a.id === s.combatTarget);
+          if (!target || target.hp <= 0) {
+            s.combatTarget = null;
+          } else {
+            const td = Math.abs(target.x - s.player.x) + Math.abs(target.y - s.player.y);
+            const range = computePlayerRange(s);
+            if (td <= range
+                && s.player.stamina >= STAMINA_FLOOR_TO_SWING
+                && now - (s.player.lastAttackMs || 0) >= computePlayerAttackSpeed(s, PROFESSIONS)) {
+              const result = applyAttack(s, target.id);
+              s = result.state;
+              if (result.hit) {
+                s.player = { ...s.player, lastAttackMs: now, lungeUntil: now + 200, stamina: Math.max(0, s.player.stamina) };
+                if (onPlayerSwing) onPlayerSwing({ dmg: result.hit.dmg, lethal: result.hit.lethal, x: result.hit.x, y: result.hit.y });
+              }
+            }
+          }
+        }
+
+        // Animal attacks (per-animal timers)
+        s.animals = s.animals.map(a => {
+          if (a.hp <= 0 || !a.hostile) return a;
+          if (isFirstNight) return a;
+          const attackMs = ANIMAL_ATTACK_SPEED[a.type];
+          if (!attackMs) return a;
+          const d = Math.abs(a.x - s.player.x) + Math.abs(a.y - s.player.y);
+          if (d > 1) return a;
+          if (a.type === 'wolf' && !(isNight || s.eventEffects.extraWolfAggression)) return a;
+          if (a.type === 'boar' && !a.aggro) return a;
+          if (now - (a.lastAttackMs || 0) < attackMs) return a;
+          const baseDmg = a.type === 'wolf' ? 8 : a.type === 'boar' ? 12 : 20;
+          const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
+          s.player.hp = Math.max(0, s.player.hp - dmgTaken);
+          const msg = a.type === 'wolf' ? '🐺 A wolf attacks!' : a.type === 'boar' ? '🐗 A boar gores you!' : '🐻 THE BEAR MAULS YOU!';
+          s = addLog(s, msg);
+          if (s.player.hp <= 0 && !s.deathCause) {
+            s.deathCause = a.type === 'wolf' ? 'Killed by a wolf.' : a.type === 'boar' ? 'Gored by a boar.' : 'The bear got you.';
+          }
+          if (onAnimalSwing) onAnimalSwing({ dmg: dmgTaken, animalId: a.id, px: s.player.x, py: s.player.y });
+          return { ...a, lastAttackMs: now, lungeUntil: now + 200 };
+        });
+
+        // Animal movement (every 8 ticks). Animals engaged with the player
+        // (player.combatTarget === a.id) stay locked in their tile.
         if (tickRef.current % 8 === 0) {
           s.animals = s.animals.map(a => {
             if (a.hp <= 0) return a;
+            if (s.combatTarget === a.id) return a;
             let nx = a.x, ny = a.y;
             const dx = s.player.x - a.x;
             const dy = s.player.y - a.y;
             const dist = Math.abs(dx) + Math.abs(dy);
 
-            const isFirstNight = (s.day === 1 && s.time >= 18) || (s.day === 2 && s.time < 6);
             if (a.type === 'wolf' && (isNight || s.eventEffects.extraWolfAggression) && dist < (s.eventEffects.extraWolfAggression ? 10 : 8)) {
               if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
               else ny += Math.sign(dy);
-              if (dist <= 1 && !isFirstNight) {
-                const baseDmg = 8;
-                const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
-                s.player.hp = Math.max(0, s.player.hp - dmgTaken);
-                s = addLog(s, '🐺 A wolf attacks!');
-                if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'Killed by a wolf.';
-              }
             } else if (a.type === 'boar' && a.aggro && dist < 6) {
               if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
               else ny += Math.sign(dy);
-              if (dist <= 1) {
-                const baseDmg = 12;
-                const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
-                s.player.hp = Math.max(0, s.player.hp - dmgTaken);
-                s = addLog(s, '🐗 A boar gores you!');
-                if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'Gored by a boar.';
-              }
             } else if (a.type === 'bear') {
               if (dist < 5) {
                 if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
                 else ny += Math.sign(dy);
-                if (dist <= 1 && !isFirstNight) {
-                  const baseDmg = 20;
-                  const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
-                  s.player.hp = Math.max(0, s.player.hp - dmgTaken);
-                  s = addLog(s, '🐻 THE BEAR MAULS YOU!');
-                  if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'The bear got you.';
-                }
               } else {
                 const hdx = a.homeX - a.x, hdy = a.homeY - a.y;
                 if (Math.abs(hdx) + Math.abs(hdy) > 1) {
@@ -309,7 +351,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [gameStarted, state.paused, state.dead, state.rescued, state.gameSpeed, map, moveTarget, addLog, setMap, setState]);
+  }, [gameStarted, state.paused, state.dead, state.rescued, state.gameSpeed, map, moveTarget, addLog, setMap, setState, onPlayerSwing, onAnimalSwing]);
 
   return { resetTick: () => { tickRef.current = 0; } };
 }

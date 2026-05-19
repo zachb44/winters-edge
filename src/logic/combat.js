@@ -2,51 +2,64 @@ import { PROFESSIONS } from '../data/professions.js';
 import { rollFromTable, ITEM_INFO } from '../data/loot.js';
 import { pushLog } from './log.js';
 import { gainXp } from './progression.js';
+import { applyXp, XP_REWARDS, powerDamageMultiplier } from '../data/leveling.js';
 
-// Pure state transition: apply the player's melee/ranged attack against `animal`.
-// Caller handles cosmetic side-effects (hit flashes, screen shake).
-// Returns the new state.
-export function applyAttack(prev, animal) {
-  let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
-  const prof = PROFESSIONS[s.profession];
-  let dmg = 8 + Math.floor(s.skills.hunting * 2) + (s.equipment.hasKnife ? 4 : 0);
+// Compute outgoing player damage against `animal`. Pure.
+export function computePlayerDamage(state, animal) {
+  const prof = PROFESSIONS[state.profession];
+  let dmg = 8 + Math.floor(state.skills.hunting * 2) + (state.equipment.hasKnife ? 4 : 0);
   if (prof.mods.huntingDmgBonus && ['rabbit','deer','wolf','boar','bear','seal','raven'].includes(animal.type)) {
     dmg = Math.floor(dmg * prof.mods.huntingDmgBonus);
   }
   if (prof.mods.combatBonus) dmg = Math.floor(dmg * prof.mods.combatBonus);
   if (prof.mods.combatPenalty) dmg = Math.floor(dmg * prof.mods.combatPenalty);
-  if (s.inventory.rifle > 0) dmg += 15;
-  else if (s.inventory.hunting_bow > 0) dmg += 8;
-  else if (s.inventory.hatchet > 0) dmg += 5;
+  if (state.inventory.rifle > 0) dmg += 15;
+  else if (state.inventory.hunting_bow > 0) dmg += 8;
+  else if (state.inventory.hatchet > 0) dmg += 5;
+  dmg = Math.floor(dmg * powerDamageMultiplier(state));
+  return Math.max(1, dmg);
+}
+
+// Pure state transition: apply ONE swing of the player's attack against the
+// animal with id === `animalId`. Returns { state, hit: {dmg, lethal} | null }.
+// Caller handles cosmetic side-effects (hit flashes, lunge, damage numbers).
+export function applyAttack(prev, animalId) {
+  const target = prev.animals.find(a => a.id === animalId);
+  if (!target || target.hp <= 0) return { state: prev, hit: null };
+
+  let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
+  const dmg = computePlayerDamage(s, target);
+  let lethal = false;
 
   const newAnimals = s.animals.map(a => {
-    if (a === animal) {
-      const newHp = a.hp - dmg;
-      if (newHp <= 0) {
-        if (a.type === 'rabbit') { s.inventory.raw_meat += 1; s = pushLog(s, '🐰 Killed rabbit (+1 raw meat)'); }
-        else if (a.type === 'wolf') { s.inventory.raw_meat += 2; s.inventory.pelts += 1; s = pushLog(s, '🐺 Killed wolf (+2 meat, +1 pelt)'); }
-        else if (a.type === 'boar') { s.inventory.raw_meat += 4; s = pushLog(s, '🐗 Killed boar (+4 meat)'); }
-        else if (a.type === 'bear') {
-          const drops = rollFromTable('bear');
-          let msg = '🐻 KILLED THE BEAR!';
-          for (const drop of drops) {
-            s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
-            msg += ` +${drop.qty}${ITEM_INFO[drop.item].icon}`;
-          }
-          s = pushLog(s, msg);
+    if (a.id !== animalId) return a;
+    const newHp = a.hp - dmg;
+    if (newHp <= 0) {
+      lethal = true;
+      if (a.type === 'rabbit') { s.inventory.raw_meat += 1; s = pushLog(s, '🐰 Killed rabbit (+1 raw meat)'); }
+      else if (a.type === 'wolf') { s.inventory.raw_meat += 2; s.inventory.pelts += 1; s = pushLog(s, '🐺 Killed wolf (+2 meat, +1 pelt)'); }
+      else if (a.type === 'boar') { s.inventory.raw_meat += 4; s = pushLog(s, '🐗 Killed boar (+4 meat)'); }
+      else if (a.type === 'bear') {
+        const drops = rollFromTable('bear');
+        let msg = '🐻 KILLED THE BEAR!';
+        for (const drop of drops) {
+          s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
+          msg += ` +${drop.qty}${ITEM_INFO[drop.item].icon}`;
         }
-        else if (a.type === 'deer') { s.inventory.raw_meat += 5; s.inventory.pelts += 1; s = pushLog(s, '🦌 Killed deer (+5 meat, +1 pelt)'); }
-        else if (a.type === 'seal') { s.inventory.raw_meat += 3; s.inventory.fat += 2; s = pushLog(s, '🦭 Killed seal (+3 meat, +2 fat)'); }
-        else if (a.type === 'raven') { s.inventory.raw_meat += 1; s = pushLog(s, '🦅 Killed raven (+1 meat)'); }
-        s = gainXp(s, 'hunting', 15);
-        return { ...a, hp: 0 };
+        s = pushLog(s, msg);
       }
-      if (a.type === 'boar') a.aggro = true;
-      return { ...a, hp: newHp };
+      else if (a.type === 'deer') { s.inventory.raw_meat += 5; s.inventory.pelts += 1; s = pushLog(s, '🦌 Killed deer (+5 meat, +1 pelt)'); }
+      else if (a.type === 'seal') { s.inventory.raw_meat += 3; s.inventory.fat += 2; s = pushLog(s, '🦭 Killed seal (+3 meat, +2 fat)'); }
+      else if (a.type === 'raven') { s.inventory.raw_meat += 1; s = pushLog(s, '🦅 Killed raven (+1 meat)'); }
+      s = gainXp(s, 'hunting', 15);
+      s = applyXp(s, XP_REWARDS.killAnimal[a.type] || 0);
+      return { ...a, hp: 0 };
     }
-    return a;
+    if (a.type === 'boar') return { ...a, hp: newHp, aggro: true };
+    return { ...a, hp: newHp };
   });
   s.animals = newAnimals.filter(a => a.hp > 0);
+  if (lethal && s.combatTarget === animalId) s.combatTarget = null;
   s.player = { ...s.player, stamina: Math.max(0, s.player.stamina - 12) };
-  return s;
+  return { state: s, hit: { dmg, lethal, x: target.x, y: target.y } };
 }

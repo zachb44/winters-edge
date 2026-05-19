@@ -23,7 +23,27 @@ export function loadGame() {
       clearSave();
       return null;
     }
-    return data;
+    // Backfill defaults for fields introduced after this save was written.
+    return {
+      ...data,
+      state: {
+        ...state,
+        combatTarget: state.combatTarget ?? null,
+        characterXp: state.characterXp ?? 0,
+        characterLevel: state.characterLevel ?? 1,
+        unspentStatPoints: state.unspentStatPoints ?? 0,
+        statUpgrades: state.statUpgrades ?? { vitality: 0, insulation: 0, endurance: 0, power: 0 },
+        player: {
+          ...state.player,
+          maxHp: state.player.maxHp ?? 100,
+          maxWarmth: state.player.maxWarmth ?? 100,
+          maxHunger: state.player.maxHunger ?? 100,
+          maxStamina: state.player.maxStamina ?? 100,
+          lastAttackMs: state.player.lastAttackMs ?? 0,
+          lungeUntil: state.player.lungeUntil ?? 0,
+        },
+      },
+    };
   } catch {
     clearSave();
     return null;

@@ -6,13 +6,21 @@ import { PROFESSIONS } from '../data/professions.js';
 import { LOOT_BUDGET } from '../data/loot.js';
 import { visibilityAt } from '../logic/visibility.js';
 import { PredatorAlert } from './PredatorAlert.jsx';
+import { FloatingDamage } from './FloatingDamage.jsx';
+import { CombatOverlay } from './CombatOverlay.jsx';
 
 export function MapView({
   state, map, view, fog, mapScale,
   snowflakes, hitFlashes, footprints, screenShake, playerBob, moveTarget,
   hover, setHover, tooltipReady, selectedBuild,
   onTileClick,
+  damageNumbers,
 }) {
+  const now = Date.now();
+  const target = state.combatTarget != null ? state.animals.find(a => a.id === state.combatTarget) : null;
+  const playerLungeOff = (state.player.lungeUntil > now && target)
+    ? { dx: Math.sign(target.x - state.player.x) * 4, dy: Math.sign(target.y - state.player.y) * 4 }
+    : { dx: 0, dy: 0 };
   let skyColor = 'rgba(0,0,0,0)';
   if (state.time < 5) skyColor = 'rgba(15, 25, 55, 0.6)';
   else if (state.time < 6) skyColor = 'rgba(60, 50, 90, 0.4)';
@@ -161,11 +169,14 @@ export function MapView({
         {state.animals.filter(a => a.hp > 0 && a.x >= view.x && a.x < view.x + VIEW_W && a.y >= view.y && a.y < view.y + VIEW_H).map((a, i) => {
           const vis = visibilityAt(fog, state.player.x, state.player.y, a.x, a.y);
           if (vis < 2) return null;
+          const lunging = a.lungeUntil > now;
+          const lx = lunging ? Math.sign(state.player.x - a.x) * 4 : 0;
+          const ly = lunging ? Math.sign(state.player.y - a.y) * 4 : 0;
           return (
-            <div key={`a-${i}`} className="absolute flex items-center justify-center pointer-events-none"
+            <div key={`a-${a.id ?? i}`} className="absolute flex items-center justify-center pointer-events-none"
               style={{
-                left: (a.x - view.x) * TILE, top: (a.y - view.y) * TILE, width: TILE, height: TILE, fontSize: 22,
-                transition: 'left 0.3s, top 0.3s',
+                left: (a.x - view.x) * TILE + lx, top: (a.y - view.y) * TILE + ly, width: TILE, height: TILE, fontSize: 22,
+                transition: 'left 0.1s, top 0.1s',
               }}>
               {a.type === 'rabbit' && '🐰'}
               {a.type === 'wolf' && '🐺'}
@@ -180,10 +191,10 @@ export function MapView({
 
         <div className="absolute flex items-center justify-center pointer-events-none z-10"
           style={{
-            left: (state.player.x - view.x) * TILE,
-            top: (state.player.y - view.y) * TILE + (moveTarget ? Math.sin(playerBob * 0.3) * 2 : 0),
+            left: (state.player.x - view.x) * TILE + playerLungeOff.dx,
+            top: (state.player.y - view.y) * TILE + playerLungeOff.dy + (moveTarget ? Math.sin(playerBob * 0.3) * 2 : 0),
             width: TILE, height: TILE, fontSize: 26,
-            transition: 'left 0.2s, top 0.2s',
+            transition: 'left 0.1s, top 0.1s',
             filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.5))',
           }}>
           {PROFESSIONS[state.profession].playerEmoji}
@@ -254,6 +265,8 @@ export function MapView({
           );
         })}
 
+        <CombatOverlay combatTarget={state.combatTarget} animals={state.animals} player={state.player} view={view} />
+        <FloatingDamage items={damageNumbers} view={view} />
         <PredatorAlert predator={nearbyPredator} />
 
         {tooltipReady && hover && (() => {

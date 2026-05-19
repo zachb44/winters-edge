@@ -1,8 +1,15 @@
 // Initial wildlife placement for a new run. Hand-tuned spawn points so
 // the player encounters a representative mix in their starting biome.
 // Day-based respawns happen in the main tick loop (game loop hook).
+//
+// Each animal carries a unique `id` so combat state can refer to it stably
+// even though the animals array is rebuilt every tick.
+let _nextAnimalId = 1;
+export function newAnimalId() { return _nextAnimalId++; }
+
 export function spawnInitialAnimals() {
-  return [
+  _nextAnimalId = 1;
+  const base = [
     { type: 'rabbit', x: 42, y: 8, hp: 10, hostile: false },
     { type: 'rabbit', x: 20, y: 28, hp: 10, hostile: false },
     { type: 'rabbit', x: 50, y: 18, hp: 10, hostile: false },
@@ -26,4 +33,5 @@ export function spawnInitialAnimals() {
     { type: 'raven', x: 40, y: 30, hp: 5, hostile: false },
     { type: 'raven', x: 5, y: 5, hp: 5, hostile: false },
   ];
+  return base.map(a => ({ ...a, id: newAnimalId(), maxHp: a.hp }));
 }

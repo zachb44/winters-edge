@@ -10,6 +10,7 @@ import { spawnInitialAnimals } from './logic/animals.js';
 import { applyAttack } from './logic/combat.js';
 import { gainXp } from './logic/progression.js';
 import { pushLog } from './logic/log.js';
+import { applyXp, XP_REWARDS, STAT_UPGRADES, levelProgress } from './data/leveling.js';
 import { saveGame, loadGame, clearSave } from './logic/saveLoad.js';
 import { SetupScreen } from './components/SetupScreen.jsx';
 import { IntroOverlay } from './components/IntroOverlay.jsx';
@@ -22,6 +23,9 @@ import { SkillsMenu } from './components/SkillsMenu.jsx';
 import { HelpMenu } from './components/HelpMenu.jsx';
 import { DeathScreen } from './components/DeathScreen.jsx';
 import { DayBanner } from './components/DayBanner.jsx';
+import { LevelUpOverlay } from './components/LevelUpOverlay.jsx';
+import { LevelButton } from './components/LevelButton.jsx';
+import { StatUpgradeModal } from './components/StatUpgradeModal.jsx';
 import { useGameLoop } from './hooks/useGameLoop.js';
 
 const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
@@ -37,7 +41,13 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
   const startWarmth = prof.mods.startWarmth || 80;
 
   return {
-    player: { x: startPos.x + 2, y: startPos.y, hp: 100, warmth: startWarmth, hunger: 80, stamina: 100, name: charName },
+    player: {
+      x: startPos.x + 2, y: startPos.y,
+      hp: 100, warmth: startWarmth, hunger: 80, stamina: 100,
+      maxHp: 100, maxWarmth: 100, maxHunger: 100, maxStamina: 100,
+      lastAttackMs: 0, lungeUntil: 0,
+      name: charName,
+    },
     profession,
     inventory: baseInv,
     skills: { foraging: 1, hunting: 1, crafting: 1, foragingXp: 0, huntingXp: 0, craftingXp: 0 },
@@ -61,6 +71,11 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
     showIntro: true,
     crashSiteName: '',
     deathCause: null,
+    combatTarget: null,
+    characterXp: 0,
+    characterLevel: 1,
+    unspentStatPoints: 0,
+    statUpgrades: { vitality: 0, insulation: 0, endurance: 0, power: 0 },
   };
 };
 
@@ -87,6 +102,10 @@ export default function WintersEdge() {
   const [mapScale, setMapScale] = useState(1);
   const [dayBanner, setDayBanner] = useState(null);
   const [tooltipReady, setTooltipReady] = useState(false);
+  const [damageNumbers, setDamageNumbers] = useState([]);
+  const [levelUpBanner, setLevelUpBanner] = useState(null);
+  const [statModalOpen, setStatModalOpen] = useState(false);
+  const damageIdRef = useRef(0);
   const [savedGameMeta, setSavedGameMeta] = useState(() => {
     const s = loadGame();
     return s ? { day: s.state.day, profession: s.state.profession } : null;
@@ -172,7 +191,6 @@ export default function WintersEdge() {
 
   const addLog = useCallback(pushLog, []);
 
-  const { resetTick } = useGameLoop({ gameStarted, state, setState, map, setMap, moveTarget, addLog });
 
   // Visual effects loop
   useEffect(() => {
@@ -202,6 +220,7 @@ export default function WintersEdge() {
       });
       setFootprints(prev => prev.filter(f => now - f.ts < 8000));
       setHitFlashes(prev => prev.filter(f => now - f.ts < 500));
+      setDamageNumbers(prev => prev.filter(f => now - f.ts < 800));
       setScreenShake(prev => Math.max(0, prev - 1));
       setPlayerBob(prev => moveTarget ? (prev + 1) % 360 : 0);
     }, 50);
@@ -263,6 +282,17 @@ export default function WintersEdge() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.day]);
 
+  // Level-up banner (fires on any change to characterLevel, skipping the
+  // initial 1 → 1 render at game start)
+  useEffect(() => {
+    if (!gameStarted) return;
+    if ((state.characterLevel || 1) <= 1) return;
+    setLevelUpBanner({ level: state.characterLevel });
+    const t = setTimeout(() => setLevelUpBanner(null), 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.characterLevel]);
+
   // Hover tooltip delay (300ms after entering a tile)
   useEffect(() => {
     if (!hover) { setTooltipReady(false); return; }
@@ -287,6 +317,18 @@ export default function WintersEdge() {
       setState(prev => {
         if (!moveTarget) return prev;
         const tx = moveTarget.x, ty = moveTarget.y;
+        // If we're chasing a combat target, stop walking once we're in attack range.
+        if (prev.combatTarget !== null) {
+          const tgt = prev.animals.find(a => a.id === prev.combatTarget);
+          if (tgt) {
+            const td = Math.abs(tgt.x - prev.player.x) + Math.abs(tgt.y - prev.player.y);
+            const range = (prev.inventory.hunting_bow > 0 || prev.inventory.rifle > 0) ? 3 : 1;
+            if (td <= range) {
+              setMoveTarget(null);
+              return prev;
+            }
+          }
+        }
         if (prev.player.x === tx && prev.player.y === ty) {
           setMoveTarget(null);
           return prev;
@@ -329,12 +371,14 @@ export default function WintersEdge() {
         const amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus) + earlyBonus;
         s.inventory.wood += amount;
         s = gainXp(s, 'foraging', 5);
+        s = applyXp(s, XP_REWARDS.chopTree);
         s.player.stamina = Math.max(0, s.player.stamina - 8);
         s = addLog(s, `🪓 Chopped wood (+${amount})`);
         setMap(m => { const nm = m.map(r => [...r]); nm[ty][tx] = T.SNOW; return nm; });
         s.trees = { ...s.trees, [`${tx},${ty}`]: 6 };
       } else if (tile === T.ROCK) {
         s.inventory.stone += prof.mods.miningBonus ? 2 : 1;
+        s = applyXp(s, XP_REWARDS.mineRock);
         s.player.stamina = Math.max(0, s.player.stamina - (prof.mods.miningBonus ? 7 : 10));
         s = addLog(s, `⛏️ +${prof.mods.miningBonus ? 2 : 1} stone`);
         if (Math.random() < (prof.mods.miningBonus ? 0.55 : 0.4)) {
@@ -366,6 +410,7 @@ export default function WintersEdge() {
             const info = ITEM_INFO[drop.item];
             s = addLog(s, `${info.icon} ${label}: ${drop.qty}× ${info.name}`);
           }
+          s = applyXp(s, XP_REWARDS.lootRoll);
           lootCounts[key] = remaining - 1;
           if (lootCounts[key] <= 0) {
             s = addLog(s, '🗑️ Picked clean.');
@@ -395,17 +440,40 @@ export default function WintersEdge() {
         s = addLog(s, msg);
       }
       s.crates = s.crates.filter(c => c !== crate);
+      s = applyXp(s, XP_REWARDS.lootCrate);
       return s;
     });
   };
 
-  const attack = (animal) => {
-    setHitFlashes(prev => [...prev, {
-      id: flashIdRef.current++,
-      x: animal.x, y: animal.y, color: 'white', ts: Date.now(),
-    }]);
-    setState(prev => applyAttack(prev, animal));
+  const engage = (animal) => {
+    setState(prev => ({ ...prev, combatTarget: animal.id }));
+    const d = Math.abs(animal.x - state.player.x) + Math.abs(animal.y - state.player.y);
+    const range = (state.inventory.hunting_bow > 0 || state.inventory.rifle > 0) ? 3 : 1;
+    if (d > range) setMoveTarget({ x: animal.x, y: animal.y });
+    else setMoveTarget(null);
   };
+
+  const addDamageNumber = useCallback((opts) => {
+    setDamageNumbers(prev => [...prev.slice(-30), { id: damageIdRef.current++, ts: Date.now(), ...opts }]);
+  }, []);
+
+  const addHitFlash = useCallback((opts) => {
+    setHitFlashes(prev => [...prev, { id: flashIdRef.current++, ts: Date.now(), ...opts }]);
+  }, []);
+
+  const onPlayerSwing = useCallback((hit) => {
+    addDamageNumber({ x: hit.x, y: hit.y, value: hit.dmg, color: 'white' });
+    addHitFlash({ x: hit.x, y: hit.y, color: 'white' });
+  }, [addDamageNumber, addHitFlash]);
+
+  const onAnimalSwing = useCallback((hit) => {
+    addDamageNumber({ x: hit.px, y: hit.py, value: hit.dmg, color: 'red' });
+  }, [addDamageNumber]);
+
+  const { resetTick } = useGameLoop({
+    gameStarted, state, setState, map, setMap, moveTarget, addLog,
+    onPlayerSwing, onAnimalSwing,
+  });
 
   const placeBuilding = (tx, ty) => {
     if (!selectedBuild) return;
@@ -432,6 +500,7 @@ export default function WintersEdge() {
       if (selectedBuild === 'trap') nb.caught = false;
       s.buildings = [...s.buildings, nb];
       s = gainXp(s, 'crafting', 10);
+      s = applyXp(s, XP_REWARDS.buildStructure);
       s = addLog(s, `✅ Built ${BUILDINGS[selectedBuild].name}`);
       return s;
     });
@@ -471,7 +540,7 @@ export default function WintersEdge() {
           s = addLog(s, '🍳 Cooked raw meat');
         } else if (s.inventory.wood >= 1) {
           s.inventory.wood -= 1;
-          s.buildings = s.buildings.map(x => x === b ? { ...x, fuel: Math.min(20, x.fuel + 4) } : x);
+          s.buildings = s.buildings.map(x => x === b ? { ...x, fuel: Math.min(20, x.fuel + 4), wentOutLogged: false } : x);
           s = addLog(s, '🔥 Added wood to fire');
         } else {
           s = addLog(s, 'No wood and no raw meat to cook.');
@@ -480,8 +549,8 @@ export default function WintersEdge() {
         if (s.time > 19 || s.time < 6) {
           s.time = 7;
           s.day += 1;
-          s.player.warmth = Math.min(100, s.player.warmth + 30);
-          s.player.stamina = 100;
+          s.player.warmth = Math.min(s.player.maxWarmth ?? 100, s.player.warmth + 30);
+          s.player.stamina = s.player.maxStamina ?? 100;
           s = addLog(s, '😴 You sleep through the night.');
           if (s.day === 30 && s.scenario === 'rescue') {
             s.rescued = true;
@@ -499,35 +568,46 @@ export default function WintersEdge() {
     });
   };
 
+  const pickStat = (key) => {
+    setState(prev => {
+      if ((prev.unspentStatPoints || 0) <= 0) return prev;
+      const def = STAT_UPGRADES[key];
+      if (!def) return prev;
+      const next = def.apply({ ...prev, statUpgrades: { ...(prev.statUpgrades || {}) } });
+      return { ...next, unspentStatPoints: (prev.unspentStatPoints || 0) - 1 };
+    });
+    setStatModalOpen(false);
+  };
+
   const eat = (type) => {
     setState(prev => {
       let s = { ...prev, inventory: { ...prev.inventory } };
       const prof = PROFESSIONS[s.profession];
       if (type === 'food' && s.inventory.food > 0) {
         s.inventory.food -= 1;
-        s.player.hunger = Math.min(100, s.player.hunger + 30);
+        s.player.hunger = Math.min(s.player.maxHunger ?? 100, s.player.hunger + 30);
         s = addLog(s, '🥫 Ate a ration (+30 hunger)');
       } else if (type === 'raw_meat' && s.inventory.raw_meat > 0) {
         s.inventory.raw_meat -= 1;
-        s.player.hunger = Math.min(100, s.player.hunger + 15);
+        s.player.hunger = Math.min(s.player.maxHunger ?? 100, s.player.hunger + 15);
         s = addLog(s, '🍖 Ate raw meat (+15 hunger)');
       } else if (type === 'cooked_meat' && s.inventory.cooked_meat > 0) {
         s.inventory.cooked_meat -= 1;
-        s.player.hunger = Math.min(100, s.player.hunger + 40);
+        s.player.hunger = Math.min(s.player.maxHunger ?? 100, s.player.hunger + 40);
         s = addLog(s, '🍗 Ate cooked meat (+40 hunger)');
       } else if (type === 'fat' && s.inventory.fat > 0) {
         s.inventory.fat -= 1;
-        s.player.warmth = Math.min(100, s.player.warmth + 25);
-        s.player.hunger = Math.min(100, s.player.hunger + 15);
+        s.player.warmth = Math.min(s.player.maxWarmth ?? 100, s.player.warmth + 25);
+        s.player.hunger = Math.min(s.player.maxHunger ?? 100, s.player.hunger + 15);
         s = addLog(s, '🟡 Ate fat (+25 warmth, +15 hunger)');
       } else if (type === 'medkit' && s.inventory.medkit > 0) {
         s.inventory.medkit -= 1;
         const healAmount = 50 + (prof.mods.medkitBonus || 0);
-        s.player.hp = Math.min(100, s.player.hp + healAmount);
+        s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + healAmount);
         s = addLog(s, `🏥 Used medkit (+${healAmount} HP)`);
       } else if (type === 'dried_meat' && s.inventory.dried_meat > 0) {
         s.inventory.dried_meat -= 1;
-        s.player.hunger = Math.min(100, s.player.hunger + 35);
+        s.player.hunger = Math.min(s.player.maxHunger ?? 100, s.player.hunger + 35);
         s = addLog(s, '🥓 Ate dried meat (+35 hunger)');
       }
       return s;
@@ -545,7 +625,12 @@ export default function WintersEdge() {
       else if (e.key === '1') setState(s => ({ ...s, gameSpeed: 1 }));
       else if (e.key === '2') setState(s => ({ ...s, gameSpeed: 2 }));
       else if (e.key === '3') setState(s => ({ ...s, gameSpeed: 3 }));
-      else if (e.key === 'Escape') { setMenu(null); setSelectedBuild(null); }
+      else if (e.key === 'Escape') {
+        setMenu(null);
+        setSelectedBuild(null);
+        setStatModalOpen(false);
+        setState(s => s.combatTarget !== null ? ({ ...s, combatTarget: null }) : s);
+      }
     };
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
@@ -573,7 +658,10 @@ export default function WintersEdge() {
     if (crate && d <= 1) { lootCrate(crate); return; }
 
     const animal = state.animals.find(a => a.x === tx && a.y === ty && a.hp > 0);
-    if (animal && d <= 1) { attack(animal); return; }
+    if (animal) { engage(animal); return; }
+
+    // Non-animal click: disengage combat
+    if (state.combatTarget !== null) setState(prev => ({ ...prev, combatTarget: null }));
 
     const building = state.buildings.find(b => b.x === tx && b.y === ty);
     if (building && d <= 1) { interactBuilding(building); return; }
@@ -622,6 +710,7 @@ export default function WintersEdge() {
             hover={hover} setHover={setHover}
             tooltipReady={tooltipReady} selectedBuild={selectedBuild}
             onTileClick={handleTileClick}
+            damageNumbers={damageNumbers}
           />
 
           <div className="flex flex-col gap-1 w-72 flex-shrink-0 min-h-0">
@@ -664,6 +753,9 @@ export default function WintersEdge() {
         )}
 
         <DayBanner banner={dayBanner} />
+        <LevelUpOverlay banner={levelUpBanner} />
+        <LevelButton pending={state.unspentStatPoints || 0} onClick={() => setStatModalOpen(true)} />
+        <StatUpgradeModal open={statModalOpen} state={state} onPick={pickStat} onClose={() => setStatModalOpen(false)} />
 
         <IntroOverlay
           show={state.showIntro}
