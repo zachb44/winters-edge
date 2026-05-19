@@ -283,8 +283,13 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           }
         }
 
-        // Animal attacks (per-animal timers)
-        s.animals = s.animals.map(a => {
+        // Animal attacks (per-animal timers).
+        // Capture the mapped array in a local first — `s` gets reassigned by
+        // addLog inside the callback, so writing back via `s.animals = ...`
+        // outside the map ensures the new array lands on the final `s`
+        // (otherwise the lastAttackMs updates get stranded on a stale object
+        // and the throttle never takes effect).
+        const updatedAnimals = s.animals.map(a => {
           if (a.hp <= 0 || !a.hostile) return a;
           if (isFirstNight) return a;
           const attackMs = ANIMAL_ATTACK_SPEED[a.type];
@@ -306,6 +311,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           if (onAnimalSwing) onAnimalSwing({ dmg: dmgTaken, animalId: a.id, px: s.player.x, py: s.player.y });
           return { ...a, lastAttackMs: now, lungeUntil: now + 200 };
         });
+        s.animals = updatedAnimals;
 
         // Animal movement (every 8 ticks). Animals engaged with the player
         // (player.combatTarget === a.id) stay locked in their tile.
