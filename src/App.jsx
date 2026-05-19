@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, VISION_RADIUS, TIME_SCALE } from './constants.js';
+import { TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, VISION_RADIUS } from './constants.js';
 import { T, TILE_DATA } from './data/tiles.js';
 import { BUILDINGS } from './data/buildings.js';
 import { PROFESSIONS } from './data/professions.js';
 import { ITEM_INFO, LOOT_BUDGET, rollFromTable } from './data/loot.js';
-import { rollDailyEvent } from './data/events.js';
 import { genMap } from './logic/mapGen.js';
 import { visibilityAt } from './logic/visibility.js';
 import { spawnInitialAnimals } from './logic/animals.js';
@@ -23,6 +22,7 @@ import { SkillsMenu } from './components/SkillsMenu.jsx';
 import { HelpMenu } from './components/HelpMenu.jsx';
 import { DeathScreen } from './components/DeathScreen.jsx';
 import { DayBanner } from './components/DayBanner.jsx';
+import { useGameLoop } from './hooks/useGameLoop.js';
 
 const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
   const prof = PROFESSIONS[profession];
@@ -94,7 +94,6 @@ export default function WintersEdge() {
   const refreshSavedMeta = useCallback((stateLike) => {
     setSavedGameMeta({ day: stateLike.day, profession: stateLike.profession });
   }, []);
-  const tickRef = useRef(0);
 
   useEffect(() => {
     const updateScale = () => {
@@ -129,7 +128,7 @@ export default function WintersEdge() {
     ];
     setState(fresh);
     setFog(Array(MAP_H).fill(null).map(() => Array(MAP_W).fill(false)));
-    tickRef.current = 0;
+    resetTick();
     setGameStarted(true);
   };
 
@@ -139,7 +138,7 @@ export default function WintersEdge() {
     setMap(save.map);
     setState({ ...save.state, paused: true, showIntro: false });
     setFog(save.fog);
-    tickRef.current = 0;
+    resetTick();
     setGameStarted(true);
   };
 
@@ -172,6 +171,8 @@ export default function WintersEdge() {
   }, [state.player.x, state.player.y, gameStarted]);
 
   const addLog = useCallback(pushLog, []);
+
+  const { resetTick } = useGameLoop({ gameStarted, state, setState, map, setMap, moveTarget, addLog });
 
   // Visual effects loop
   useEffect(() => {
@@ -279,304 +280,6 @@ export default function WintersEdge() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.dead, state.rescued]);
 
-  // Main tick
-  useEffect(() => {
-    if (!gameStarted || state.paused || state.dead || state.rescued) return;
-    const interval = setInterval(() => {
-      setState(prev => {
-        if (prev.dead || prev.rescued) return prev;
-        tickRef.current++;
-        let s = { ...prev };
-        const prof = PROFESSIONS[s.profession];
-
-        s.time = s.time + 0.2 * s.gameSpeed * TIME_SCALE;
-        if (s.time >= 24) {
-          s.time = s.time - 24;
-          s.day += 1;
-          s = addLog(s, `--- Day ${s.day} ---`);
-          const event = rollDailyEvent(s.day);
-          s.currentEvent = event;
-          s.eventEffects = {};
-          s = addLog(s, `📅 ${event.name}: ${event.desc}`);
-          if (event.id === 'wolf_pack') {
-            for (let i = 0; i < 2; i++) {
-              let wx, wy, tries = 0;
-              do {
-                wx = Math.floor(Math.random() * MAP_W);
-                wy = Math.floor(Math.random() * MAP_H);
-                tries++;
-              } while (tries < 30 && (!map[wy] || !TILE_DATA[map[wy][wx]].walkable || Math.abs(wx - s.player.x) + Math.abs(wy - s.player.y) < 8));
-              if (tries < 30) s.animals = [...s.animals, { type: 'wolf', x: wx, y: wy, hp: 25, hostile: true }];
-            }
-            s.eventEffects.extraWolfAggression = true;
-          } else if (event.id === 'cold_snap') s.eventEffects.coldSnap = true;
-          else if (event.id === 'aurora') s.eventEffects.aurora = true;
-          else if (event.id === 'deer_migration') {
-            for (let i = 0; i < 3; i++) {
-              let dx, dy, tries = 0;
-              do {
-                dx = 38 + Math.floor(Math.random() * 18);
-                dy = 3 + Math.floor(Math.random() * 13);
-                tries++;
-              } while (tries < 20 && (!map[dy] || !TILE_DATA[map[dy][dx]].walkable));
-              if (tries < 20) s.animals = [...s.animals, { type: 'deer', x: dx, y: dy, hp: 20, hostile: false }];
-            }
-          } else if (event.id === 'crate_signal' || event.id === 'cache_rumor') {
-            s.nextCrateDay = s.day;
-          } else if (event.id === 'thaw') s.eventEffects.thaw = true;
-          else if (event.id === 'frozen_carcass') {
-            const cx = Math.max(1, Math.min(MAP_W - 2, s.player.x + (Math.random() < 0.5 ? -3 : 3) + Math.floor(Math.random() * 3)));
-            const cy = Math.max(1, Math.min(MAP_H - 2, s.player.y + (Math.random() < 0.5 ? -3 : 3) + Math.floor(Math.random() * 3)));
-            s.pendingCarcass = { x: cx, y: cy };
-          } else if (event.id === 'blizzard_warning') s.eventEffects.blizzardIncoming = true;
-          else if (event.id === 'bear_roaming') {
-            s.animals = s.animals.map(a => {
-              if (a.type === 'bear') {
-                let bx, by, tries = 0;
-                do {
-                  bx = Math.floor(Math.random() * MAP_W);
-                  by = Math.floor(Math.random() * MAP_H);
-                  tries++;
-                } while (tries < 20 && (!map[by] || !TILE_DATA[map[by][bx]].walkable));
-                if (tries < 20) return { ...a, x: bx, y: by, homeX: bx, homeY: by };
-              }
-              return a;
-            });
-          } else if (event.id === 'lost_traveler') {
-            s.pendingTraveler = { resolved: false };
-          }
-          if (s.day === 30 && s.scenario === 'rescue') {
-            s.rescued = true;
-            s = addLog(s, '🎉 RESCUE HELICOPTER ARRIVES! You survived!');
-            return s;
-          }
-
-          // Slow respawn at map edges (skips wolves/bears — they stay rare)
-          if (s.day >= (s.nextRespawnDay ?? 5)) {
-            const count = 1 + Math.floor(Math.random() * 2);
-            const stats = { rabbit: { hp: 10, hostile: false }, deer: { hp: 20, hostile: false }, raven: { hp: 5, hostile: false } };
-            for (let i = 0; i < count; i++) {
-              const r = Math.random();
-              const type = r < 0.5 ? 'rabbit' : r < 0.8 ? 'deer' : 'raven';
-              let sx, sy, tries = 0, ok = false;
-              while (tries < 30 && !ok) {
-                const edge = Math.floor(Math.random() * 4);
-                if (edge === 0) { sx = Math.floor(Math.random() * MAP_W); sy = Math.floor(Math.random() * 3); }
-                else if (edge === 1) { sx = Math.floor(Math.random() * MAP_W); sy = MAP_H - 1 - Math.floor(Math.random() * 3); }
-                else if (edge === 2) { sx = Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * MAP_H); }
-                else { sx = MAP_W - 1 - Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * MAP_H); }
-                const distToPlayer = Math.abs(sx - s.player.x) + Math.abs(sy - s.player.y);
-                if (map[sy] && TILE_DATA[map[sy][sx]].walkable && distToPlayer >= 10) ok = true;
-                tries++;
-              }
-              if (ok) s.animals = [...s.animals, { type, x: sx, y: sy, ...stats[type] }];
-            }
-            s.nextRespawnDay = s.day + 4 + Math.floor(Math.random() * 3);
-          }
-        }
-
-        const isNight = s.time < 6 || s.time > 19;
-        let nearFire = false, inShelter = false;
-        for (const b of s.buildings) {
-          const d = Math.abs(b.x - s.player.x) + Math.abs(b.y - s.player.y);
-          if (b.type === 'campfire' && b.fuel > 0 && d <= 3) nearFire = true;
-          if (b.type === 'tent' && d === 0) inShelter = true;
-        }
-        if (map[s.player.y] && map[s.player.y][s.player.x] === T.CAVE) inShelter = true;
-
-        let warmthDelta = -0.3;
-        if (isNight) warmthDelta = -0.7;
-        if (s.weather === 'blizzard') warmthDelta -= 0.5;
-        if (s.eventEffects.coldSnap) warmthDelta -= 0.4;
-        if (s.eventEffects.aurora && isNight) warmthDelta += 0.3;
-        if (s.eventEffects.thaw) warmthDelta += 0.2;
-        if (nearFire) warmthDelta = Math.max(warmthDelta + 1.5, 0.5);
-        if (inShelter && isNight) warmthDelta = Math.max(warmthDelta + 0.8, -0.1);
-        if (s.equipment.hasCoat) warmthDelta += 0.2;
-        if (s.inventory.fur_coat > 0) warmthDelta += 0.3;
-        if (prof.mods.warmthRetention && warmthDelta < 0) warmthDelta *= prof.mods.warmthRetention;
-        if (s.day <= 3 && warmthDelta < 0) warmthDelta *= 0.8;
-        s.player.warmth = Math.max(0, Math.min(100, s.player.warmth + warmthDelta * TIME_SCALE));
-
-        const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1) * TIME_SCALE;
-        s.player.hunger = Math.max(0, s.player.hunger - hungerDrain);
-        if (!moveTarget) s.player.stamina = Math.min(100, s.player.stamina + 0.5);
-        if (s.player.warmth < 20) {
-          s.player.hp = Math.max(0, s.player.hp - 0.5 * TIME_SCALE);
-          if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'You froze to death.';
-        }
-        if (s.player.hunger < 15) {
-          s.player.hp = Math.max(0, s.player.hp - 0.3 * TIME_SCALE);
-          if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'You starved.';
-        }
-        const regenThreshold = s.eventEffects.thaw ? 50 : 60;
-        if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp < 100) {
-          let regenAmount = s.eventEffects.thaw ? 0.4 : 0.2;
-          if (prof.mods.hpRegenBonus) regenAmount *= prof.mods.hpRegenBonus;
-          s.player.hp = Math.min(100, s.player.hp + regenAmount * TIME_SCALE);
-        }
-
-        if (s.player.hp <= 0) {
-          s.dead = true;
-          s = addLog(s, '💀 You have died.');
-          return s;
-        }
-
-        if (s.scenario === 'tower' && map[s.player.y] && map[s.player.y][s.player.x] === T.TOWER) {
-          if (s.inventory.food + s.inventory.cooked_meat >= 10 && s.inventory.wood >= 5 && s.equipment.hasCoat) {
-            s.rescued = true;
-            s = addLog(s, '📡 Radio activated. Rescue inbound! YOU WIN!');
-            return s;
-          }
-        }
-
-        s.buildings = s.buildings.map(b => {
-          if (b.type === 'campfire' && b.fuel > 0) {
-            const newFuel = b.fuel - 0.05 * s.gameSpeed * TIME_SCALE;
-            if (newFuel <= 0 && b.fuel > 0) s = addLog(s, '🔥 Campfire went out.');
-            return { ...b, fuel: Math.max(0, newFuel) };
-          }
-          return b;
-        });
-
-        if (tickRef.current % 50 === 0) {
-          s.buildings.forEach(b => {
-            if (b.type === 'trap' && !b.caught && Math.random() < 0.15) b.caught = true;
-          });
-        }
-
-        const newTrees = { ...s.trees };
-        for (const key in newTrees) {
-          newTrees[key] -= 0.2 * s.gameSpeed * TIME_SCALE / 24;
-          if (newTrees[key] <= 0) {
-            const parts = key.split(',');
-            const tx = Number(parts[0]), ty = Number(parts[1]);
-            setMap(m => {
-              const nm = m.map(r => [...r]);
-              if (nm[ty] && nm[ty][tx] === T.SNOW) nm[ty][tx] = T.TREE;
-              return nm;
-            });
-            delete newTrees[key];
-          }
-        }
-        s.trees = newTrees;
-
-        if (s.day >= s.nextCrateDay && s.time > 8 && s.time < 10 && tickRef.current % 30 === 0) {
-          let cx, cy, attempts = 0;
-          do {
-            cx = Math.floor(Math.random() * MAP_W);
-            cy = Math.floor(Math.random() * MAP_H);
-            attempts++;
-          } while (attempts < 20 && (!map[cy] || !TILE_DATA[map[cy][cx]].walkable));
-          if (attempts < 20) {
-            s.crates = [...s.crates, { x: cx, y: cy, looted: false }];
-            s.nextCrateDay = s.day + 4 + Math.floor(Math.random() * 3);
-            s = addLog(s, '📦 Supply crate spotted on the map!');
-          }
-        }
-
-        if (tickRef.current % 8 === 0) {
-          s.animals = s.animals.map(a => {
-            if (a.hp <= 0) return a;
-            let nx = a.x, ny = a.y;
-            const dx = s.player.x - a.x;
-            const dy = s.player.y - a.y;
-            const dist = Math.abs(dx) + Math.abs(dy);
-
-            const isFirstNight = (s.day === 1 && s.time >= 18) || (s.day === 2 && s.time < 6);
-            if (a.type === 'wolf' && (isNight || s.eventEffects.extraWolfAggression) && dist < (s.eventEffects.extraWolfAggression ? 10 : 8)) {
-              if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
-              else ny += Math.sign(dy);
-              if (dist <= 1 && !isFirstNight) {
-                const baseDmg = 8;
-                const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
-                s.player.hp = Math.max(0, s.player.hp - dmgTaken);
-                s = addLog(s, '🐺 A wolf attacks!');
-                if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'Killed by a wolf.';
-              }
-            } else if (a.type === 'boar' && a.aggro && dist < 6) {
-              if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
-              else ny += Math.sign(dy);
-              if (dist <= 1) {
-                const baseDmg = 12;
-                const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
-                s.player.hp = Math.max(0, s.player.hp - dmgTaken);
-                s = addLog(s, '🐗 A boar gores you!');
-                if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'Gored by a boar.';
-              }
-            } else if (a.type === 'bear') {
-              if (dist < 5) {
-                if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
-                else ny += Math.sign(dy);
-                if (dist <= 1 && !isFirstNight) {
-                  const baseDmg = 20;
-                  const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
-                  s.player.hp = Math.max(0, s.player.hp - dmgTaken);
-                  s = addLog(s, '🐻 THE BEAR MAULS YOU!');
-                  if (s.player.hp <= 0 && !s.deathCause) s.deathCause = 'The bear got you.';
-                }
-              } else {
-                const hdx = a.homeX - a.x, hdy = a.homeY - a.y;
-                if (Math.abs(hdx) + Math.abs(hdy) > 1) {
-                  if (Math.abs(hdx) > Math.abs(hdy)) nx += Math.sign(hdx);
-                  else ny += Math.sign(hdy);
-                }
-              }
-            } else if (a.type === 'deer') {
-              const fleeRange = prof.mods.deerFleeRange || 5;
-              if (dist < fleeRange) {
-                if (Math.abs(dx) > Math.abs(dy)) nx -= Math.sign(dx);
-                else ny -= Math.sign(dy);
-              } else if (Math.random() < 0.3) {
-                const dir = Math.floor(Math.random() * 4);
-                if (dir === 0) nx += 1; else if (dir === 1) nx -= 1;
-                else if (dir === 2) ny += 1; else ny -= 1;
-              }
-            } else if (a.type === 'raven') {
-              const dir = Math.floor(Math.random() * 5);
-              if (dir === 0) nx += 1; else if (dir === 1) nx -= 1;
-              else if (dir === 2) ny += 1; else if (dir === 3) ny -= 1;
-              nx = Math.max(0, Math.min(MAP_W - 1, nx));
-              ny = Math.max(0, Math.min(MAP_H - 1, ny));
-              return { ...a, x: nx, y: ny };
-            } else if (a.type === 'seal') {
-              if (Math.random() < 0.1) {
-                const dir = Math.floor(Math.random() * 4);
-                let tnx = nx, tny = ny;
-                if (dir === 0) tnx += 1; else if (dir === 1) tnx -= 1;
-                else if (dir === 2) tny += 1; else tny -= 1;
-                if (map[tny] && map[tny][tnx] === T.ICE) { nx = tnx; ny = tny; }
-              }
-            } else {
-              const dir = Math.floor(Math.random() * 5);
-              if (dir === 0) nx += 1; else if (dir === 1) nx -= 1;
-              else if (dir === 2) ny += 1; else if (dir === 3) ny -= 1;
-            }
-
-            nx = Math.max(0, Math.min(MAP_W - 1, nx));
-            ny = Math.max(0, Math.min(MAP_H - 1, ny));
-            if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
-              return { ...a, x: nx, y: ny };
-            }
-            return a;
-          });
-        }
-
-        if (tickRef.current % 200 === 0) {
-          const r = Math.random();
-          const blizzChance = s.eventEffects.blizzardIncoming ? 0.6 : 0.25;
-          if (s.day > 5 && r < blizzChance) {
-            s.weather = 'blizzard';
-            s = addLog(s, '❄️ A blizzard rolls in!');
-          } else if (r < 0.5) s.weather = 'snow';
-          else s.weather = 'clear';
-        }
-
-        return s;
-      });
-    }, 100);
-    return () => clearInterval(interval);
-  }, [gameStarted, state.paused, state.dead, state.rescued, state.gameSpeed, map, moveTarget, addLog]);
 
   useEffect(() => {
     if (!moveTarget || !gameStarted || state.paused || state.dead) return;
