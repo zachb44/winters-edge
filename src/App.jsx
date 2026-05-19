@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, VISION_RADIUS, TIME_SCALE } from './constants.js';
 import { T, TILE_DATA } from './data/tiles.js';
 import { BUILDINGS } from './data/buildings.js';
-import { SCENARIOS } from './data/scenarios.js';
 import { PROFESSIONS } from './data/professions.js';
 import { ITEM_INFO, LOOT_BUDGET, rollFromTable } from './data/loot.js';
 import { rollDailyEvent } from './data/events.js';
@@ -13,9 +12,17 @@ import { applyAttack } from './logic/combat.js';
 import { gainXp } from './logic/progression.js';
 import { pushLog } from './logic/log.js';
 import { saveGame, loadGame, clearSave } from './logic/saveLoad.js';
-import { Vital } from './components/shared/Vital.jsx';
-import { ResourceRow } from './components/shared/ResourceRow.jsx';
-import { SkillRow } from './components/shared/SkillRow.jsx';
+import { SetupScreen } from './components/SetupScreen.jsx';
+import { IntroOverlay } from './components/IntroOverlay.jsx';
+import { GameUI } from './components/GameUI.jsx';
+import { MapView } from './components/MapView.jsx';
+import { LogPanel } from './components/LogPanel.jsx';
+import { BuildMenu } from './components/BuildMenu.jsx';
+import { InventoryMenu } from './components/InventoryMenu.jsx';
+import { SkillsMenu } from './components/SkillsMenu.jsx';
+import { HelpMenu } from './components/HelpMenu.jsx';
+import { DeathScreen } from './components/DeathScreen.jsx';
+import { DayBanner } from './components/DayBanner.jsx';
 
 const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
   const prof = PROFESSIONS[profession];
@@ -878,152 +885,20 @@ export default function WintersEdge() {
     }
   };
 
-  // SETUP SCREENS
   if (!gameStarted) {
-    if (setupStep === 'scenario') {
-      return (
-        <div className="w-full min-h-screen bg-slate-900 text-slate-100 p-4 font-mono flex items-center justify-center">
-          <div className="max-w-2xl w-full">
-            <div className="text-center mb-6">
-              <div className="text-5xl mb-2">❄️</div>
-              <h1 className="text-3xl font-bold text-sky-300">Winter's Edge</h1>
-              <p className="text-slate-400 mt-2">A survival game in a frozen wilderness</p>
-            </div>
-            {savedGameMeta && (
-              <div className="mb-6">
-                <button onClick={continueGame}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-lg">
-                  ▶ Continue Run
-                </button>
-                <div className="text-center text-xs text-slate-400 mt-1">
-                  Day {savedGameMeta.day} — {PROFESSIONS[savedGameMeta.profession]?.name || 'Survivor'}
-                </div>
-                <button onClick={() => { clearSave(); setSavedGameMeta(null); }}
-                  className="w-full mt-1 text-xs text-slate-500 hover:text-slate-300">
-                  Delete saved game
-                </button>
-              </div>
-            )}
-            <div className="space-y-3 mb-6">
-              <h2 className="text-lg font-bold text-slate-300">Step 1 of 2 — Choose Your Scenario</h2>
-              {Object.entries(SCENARIOS).map(([key, sc]) => (
-                <button key={key} onClick={() => setChosenScenario(key)}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition ${chosenScenario === key ? 'border-sky-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-2xl">{sc.icon}</span>
-                    <span className="text-lg font-bold">{sc.name}</span>
-                    <span className="text-xs text-slate-400 ml-auto">{sc.difficulty}</span>
-                  </div>
-                  <p className="text-sm text-slate-300">{sc.desc}</p>
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setSetupStep('character')} className="w-full bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-lg">
-              Next: Choose Your Survivor →
-            </button>
-          </div>
-        </div>
-      );
-    }
-    if (setupStep === 'character') {
-      const prof = PROFESSIONS[chosenProfession];
-      return (
-        <div className="w-full min-h-screen bg-slate-900 text-slate-100 p-4 font-mono flex items-center justify-center">
-          <div className="max-w-3xl w-full">
-            <div className="text-center mb-4">
-              <div className="text-3xl mb-1">{prof.playerEmoji}</div>
-              <h1 className="text-2xl font-bold text-sky-300">Choose Your Survivor</h1>
-              <p className="text-slate-400 text-sm mt-1">Step 2 of 2 — Each profession plays differently</p>
-            </div>
-            <div className="mb-4">
-              <label className="text-sm text-slate-300 mb-1 block">Name your survivor:</label>
-              <input type="text" value={charName} onChange={(e) => setCharName(e.target.value.slice(0, 20))}
-                placeholder="Survivor"
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm focus:border-sky-500 outline-none" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-              {Object.entries(PROFESSIONS).map(([key, p]) => (
-                <button key={key} onClick={() => setChosenProfession(key)}
-                  className={`text-left p-3 rounded-lg border-2 transition ${chosenProfession === key ? 'border-sky-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xl">{p.emoji}</span>
-                    <span className="font-bold">{p.name}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-2">{p.desc}</p>
-                  <div className="text-xs text-green-400">
-                    {p.bonuses.map((b, i) => <div key={i}>+ {b}</div>)}
-                  </div>
-                  <div className="text-xs text-orange-400 mt-1">
-                    {p.tradeoffs.map((t, i) => <div key={i}>− {t}</div>)}
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="bg-slate-800 rounded p-3 mb-4 text-xs">
-              <div className="font-bold text-slate-300 mb-1">Starting inventory for {prof.name}:</div>
-              <div className="text-slate-400">
-                {Object.entries(prof.startInv).map(([item, qty]) => (
-                  <span key={item} className="inline-block mr-3">
-                    {(ITEM_INFO[item] && ITEM_INFO[item].icon) || '•'} {qty} {(ITEM_INFO[item] && ITEM_INFO[item].name) || item}
-                  </span>
-                ))}
-              </div>
-              <div className="text-slate-500 mt-2 italic">
-                🛬 Your plane will crash at a random location.
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setSetupStep('scenario')} className="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-lg">← Back</button>
-              <button onClick={() => { setSetupStep('scenario'); startGame(chosenScenario, chosenProfession, charName); }}
-                className="flex-1 bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-lg">
-                Begin Survival
-              </button>
-            </div>
-            <div className="mt-4 text-xs text-slate-400 space-y-1">
-              <div>• Click to move and interact. Click trees to chop, animals to attack.</div>
-              <div>• Build a campfire FAST — warmth kills you quickly.</div>
-              <div>• Keys: B I K H, Space=Pause, 1/2/3=Speed</div>
-            </div>
-          </div>
-        </div>
-      );
-    }
+    return (
+      <SetupScreen
+        setupStep={setupStep} setSetupStep={setSetupStep}
+        chosenScenario={chosenScenario} setChosenScenario={setChosenScenario}
+        chosenProfession={chosenProfession} setChosenProfession={setChosenProfession}
+        charName={charName} setCharName={setCharName}
+        savedGameMeta={savedGameMeta}
+        onContinue={continueGame}
+        onDeleteSave={() => { clearSave(); setSavedGameMeta(null); }}
+        onStartGame={startGame}
+      />
+    );
   }
-
-  const isNight = state.time < 6 || state.time > 19;
-  const timeStr = `${Math.floor(state.time).toString().padStart(2, '0')}:${Math.floor((state.time % 1) * 60).toString().padStart(2, '0')}`;
-
-  let nearbyPredator = null;
-  for (const a of state.animals) {
-    if (a.hp <= 0) continue;
-    const d = Math.abs(a.x - state.player.x) + Math.abs(a.y - state.player.y);
-    if (a.type === 'bear' && d <= 4) { nearbyPredator = 'bear'; break; }
-    if (a.type === 'wolf' && d <= 4 && isNight && nearbyPredator !== 'bear') nearbyPredator = 'wolf';
-  }
-
-  let skyColor = 'rgba(0,0,0,0)';
-  if (state.time < 5) skyColor = 'rgba(15, 25, 55, 0.6)';
-  else if (state.time < 6) skyColor = 'rgba(60, 50, 90, 0.4)';
-  else if (state.time < 7) skyColor = 'rgba(255, 150, 90, 0.18)';
-  else if (state.time < 18) skyColor = 'rgba(255, 230, 150, 0.06)';
-  else if (state.time < 19) skyColor = 'rgba(255, 130, 80, 0.22)';
-  else if (state.time < 21) skyColor = 'rgba(60, 50, 90, 0.45)';
-  else skyColor = 'rgba(15, 25, 55, 0.55)';
-
-  const weatherOverlay = state.weather === 'blizzard' ? 'rgba(255,255,255,0.25)' : state.weather === 'snow' ? 'rgba(255,255,255,0.08)' : 'transparent';
-
-  const towerProgress = state.scenario === 'tower' ? {
-    food: state.inventory.food + state.inventory.cooked_meat,
-    foodNeeded: 10,
-    wood: state.inventory.wood,
-    woodNeeded: 5,
-    coat: state.equipment.hasCoat,
-  } : null;
-
-  const shakeStyle = screenShake > 0 ? {
-    transform: `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)`,
-    transition: 'transform 0.05s',
-  } : {};
 
   return (
     <div className="w-screen h-screen bg-slate-900 text-slate-100 font-mono overflow-hidden flex flex-col">
@@ -1034,335 +909,17 @@ export default function WintersEdge() {
         @keyframes auroraShift { 0% { transform: translateX(-10%); opacity: 0.6; } 100% { transform: translateX(10%); opacity: 1; } }
       `}</style>
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto">
-        <div className="bg-slate-800 px-2 py-1 flex flex-wrap items-center gap-2 text-xs border-b border-slate-700 flex-shrink-0">
-          <div className="font-bold text-sky-300">❄️ {PROFESSIONS[state.profession].emoji} {state.player.name}</div>
-          <div>Day <span className="text-white font-bold">{state.day}</span>{state.scenario === 'rescue' ? '/30' : ''}</div>
-          <div>{timeStr} {isNight ? '🌙' : '☀️'}</div>
-          <div>
-            {state.weather === 'clear' && '☀️ Clear'}
-            {state.weather === 'snow' && '🌨️ Snowing'}
-            {state.weather === 'blizzard' && '🌬️ BLIZZARD'}
-          </div>
-          <div className="flex-1"></div>
-          <button onClick={() => setState(s => ({ ...s, paused: !s.paused }))} className="bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
-            {state.paused ? '▶ Play' : '⏸ Pause'}
-          </button>
-          <div className="flex gap-1">
-            {[1,2,3].map(sp => (
-              <button key={sp} onClick={() => setState(s => ({...s, gameSpeed: sp}))}
-                className={`px-2 py-1 rounded text-xs ${state.gameSpeed===sp?'bg-sky-600':'bg-slate-700 hover:bg-slate-600'}`}>
-                {sp}x
-              </button>
-            ))}
-          </div>
-          <button onClick={saveAndQuit} className="bg-emerald-700 hover:bg-emerald-600 px-2 py-1 rounded text-xs">
-            💾 Save &amp; Quit
-          </button>
-        </div>
-
-        <div className="bg-slate-800 px-2 py-1 flex flex-wrap gap-2 text-xs border-b border-slate-700 flex-shrink-0">
-          <Vital label="❤️ HP" value={state.player.hp} color="bg-red-500"
-                 criticalLabel={state.player.hp < 30 ? '⚠️ INJURED' : null} />
-          <Vital label="🔥 Warmth" value={state.player.warmth} color="bg-orange-400"
-                 warning={state.player.warmth < 35}
-                 criticalLabel={state.player.warmth < 25 ? '⚠️ FREEZING' : null} />
-          <Vital label="🍖 Hunger" value={state.player.hunger} color="bg-yellow-600"
-                 warning={state.player.hunger < 30}
-                 criticalLabel={state.player.hunger < 20 ? '⚠️ STARVING' : null} />
-          <Vital label="⚡ Stamina" value={state.player.stamina} color="bg-green-500" />
-        </div>
-
-        <div className="bg-slate-800 px-2 py-1 flex flex-wrap gap-3 text-xs border-b border-slate-700 flex-shrink-0">
-          <span>🪵 {state.inventory.wood}</span>
-          <span>🪨 {state.inventory.stone}</span>
-          <span>🔧 {state.inventory.scrap}</span>
-          <span>🥫 {state.inventory.food}</span>
-          <span>🍖 {state.inventory.raw_meat}</span>
-          <span>🍗 {state.inventory.cooked_meat}</span>
-          <span>🟡 {state.inventory.fat}</span>
-          <span>🦊 {state.inventory.pelts}</span>
-          {state.inventory.medkit > 0 && <span>🏥 {state.inventory.medkit}</span>}
-        </div>
-
-        {state.currentEvent && (
-          <div className="bg-indigo-900/40 border-b border-indigo-700 px-2 py-1 text-xs flex-shrink-0">
-            <span className="font-bold text-indigo-300">📅 Today: {state.currentEvent.name}</span>
-            <span className="text-slate-300 ml-2">{state.currentEvent.desc}</span>
-          </div>
-        )}
-
-        {towerProgress && (
-          <div className="bg-slate-800/80 px-2 py-1 text-xs border-b border-slate-700 flex-shrink-0">
-            <div className="font-bold text-sky-300 mb-1">📡 Reach the Radio Tower</div>
-            <div className="flex flex-wrap gap-3">
-              <span className={towerProgress.food >= towerProgress.foodNeeded ? 'text-green-400' : ''}>Food: {towerProgress.food}/{towerProgress.foodNeeded}</span>
-              <span className={towerProgress.wood >= towerProgress.woodNeeded ? 'text-green-400' : ''}>Wood: {towerProgress.wood}/{towerProgress.woodNeeded}</span>
-              <span className={towerProgress.coat ? 'text-green-400' : 'text-red-400'}>Coat: {towerProgress.coat ? '✓' : '✗'}</span>
-              <span className="text-slate-400">→ Reach tower (southwest corner)</span>
-            </div>
-          </div>
-        )}
+        <GameUI state={state} setState={setState} onSaveAndQuit={saveAndQuit} />
 
         <div className="flex flex-1 min-h-0 gap-2 p-1">
-          <div className="flex-1 flex items-center justify-center overflow-hidden min-w-0">
-          <div className="relative bg-black overflow-hidden flex-shrink-0"
-            style={{
-              width: VIEW_W * TILE,
-              height: VIEW_H * TILE,
-              minWidth: VIEW_W * TILE,
-              minHeight: VIEW_H * TILE,
-              transform: `scale(${mapScale})`,
-              transformOrigin: 'center',
-              ...shakeStyle,
-            }}>
-
-            {Array.from({ length: VIEW_H }).map((_, vy) =>
-              Array.from({ length: VIEW_W }).map((_, vx) => {
-                const tx = view.x + vx;
-                const ty = view.y + vy;
-                const tile = map[ty] && map[ty][tx];
-                if (tile === undefined) return null;
-                const data = TILE_DATA[tile];
-                const vis = visibilityAt(fog, state.player.x, state.player.y, tx, ty);
-                const depleted = (tile === T.PLANE || tile === T.CABIN)
-                  && state.lootCounts && state.lootCounts[`${tx},${ty}`] === 0;
-                let filter = 'none';
-                if (vis === 1) filter = 'brightness(0.45) saturate(0.5)';
-                else if (depleted) filter = 'grayscale(0.7) opacity(0.55)';
-                return (
-                  <div key={`${tx}-${ty}`}
-                    onClick={() => vis > 0 && handleTileClick(tx, ty)}
-                    onMouseEnter={() => setHover({ x: tx, y: ty })}
-                    onMouseLeave={() => setHover(null)}
-                    className={vis > 0 ? "absolute flex items-center justify-center cursor-pointer hover:brightness-125" : "absolute"}
-                    style={{
-                      left: vx * TILE, top: vy * TILE, width: TILE, height: TILE,
-                      background: vis === 0 ? '#0a0a0f' : data.color,
-                      fontSize: 22,
-                      filter,
-                      borderRight: '1px solid rgba(0,0,0,0.05)',
-                      borderBottom: '1px solid rgba(0,0,0,0.05)',
-                    }}>
-                    {vis > 0 && data.emoji}
-                  </div>
-                );
-              })
-            )}
-
-            {footprints.map((fp, i) => {
-              if (fp.x < view.x || fp.x >= view.x + VIEW_W || fp.y < view.y || fp.y >= view.y + VIEW_H) return null;
-              const age = Date.now() - fp.ts;
-              const opacity = Math.max(0, 1 - age / 8000) * 0.3;
-              if (opacity <= 0) return null;
-              return (
-                <div key={`fp-${fp.ts}-${i}`} className="absolute pointer-events-none"
-                  style={{
-                    left: (fp.x - view.x) * TILE + TILE/2 - 2,
-                    top: (fp.y - view.y) * TILE + TILE - 6,
-                    width: 4, height: 3,
-                    background: `rgba(120, 130, 160, ${opacity})`,
-                    borderRadius: '50%',
-                  }} />
-              );
-            })}
-
-            {state.crates.filter(c => !c.looted).map((c, i) => {
-              if (c.x < view.x || c.x >= view.x + VIEW_W || c.y < view.y || c.y >= view.y + VIEW_H) return null;
-              const vis = visibilityAt(fog, state.player.x, state.player.y, c.x, c.y);
-              if (vis === 0) return null;
-              return (
-                <div key={`crate-${i}`} className="absolute flex items-center justify-center pointer-events-none animate-pulse"
-                  style={{ left: (c.x - view.x) * TILE, top: (c.y - view.y) * TILE, width: TILE, height: TILE, fontSize: 24 }}>
-                  📦
-                </div>
-              );
-            })}
-
-            {state.pendingCarcass &&
-             state.pendingCarcass.x >= view.x && state.pendingCarcass.x < view.x + VIEW_W &&
-             state.pendingCarcass.y >= view.y && state.pendingCarcass.y < view.y + VIEW_H &&
-             visibilityAt(fog, state.player.x, state.player.y, state.pendingCarcass.x, state.pendingCarcass.y) > 0 && (
-              <div className="absolute flex items-center justify-center pointer-events-none"
-                style={{
-                  left: (state.pendingCarcass.x - view.x) * TILE,
-                  top: (state.pendingCarcass.y - view.y) * TILE,
-                  width: TILE, height: TILE, fontSize: 24,
-                }}>
-                💀
-              </div>
-            )}
-
-            {state.buildings.filter(b => b.x >= view.x && b.x < view.x + VIEW_W && b.y >= view.y && b.y < view.y + VIEW_H).map((b, i) => {
-              const vis = visibilityAt(fog, state.player.x, state.player.y, b.x, b.y);
-              if (vis === 0) return null;
-              const isLitFire = b.type === 'campfire' && b.fuel > 0;
-              return (
-                <div key={`b-${i}`}>
-                  {isLitFire && vis === 2 && (
-                    <div className="absolute pointer-events-none" style={{
-                      left: (b.x - view.x) * TILE + TILE/2 - 4,
-                      top: (b.y - view.y) * TILE - 8,
-                      width: 8, height: 16,
-                      background: 'radial-gradient(circle at 50% 100%, rgba(200,200,200,0.4), transparent 70%)',
-                      filter: 'blur(2px)',
-                      animation: 'smokeRise 3s ease-out infinite',
-                    }} />
-                  )}
-                  <div className="absolute flex items-center justify-center pointer-events-none"
-                    style={{
-                      left: (b.x - view.x) * TILE, top: (b.y - view.y) * TILE, width: TILE, height: TILE, fontSize: 24,
-                      filter: vis === 1 ? 'brightness(0.5)' : (b.type === 'campfire' && b.fuel <= 0 ? 'grayscale(1) opacity(0.5)' : 'none'),
-                      animation: isLitFire ? 'flicker 0.5s ease-in-out infinite alternate' : 'none',
-                    }}>
-                    {BUILDINGS[b.type].emoji}
-                    {b.type === 'trap' && b.caught && <span className="absolute text-xs">!</span>}
-                  </div>
-                </div>
-              );
-            })}
-
-            {state.animals.filter(a => a.hp > 0 && a.x >= view.x && a.x < view.x + VIEW_W && a.y >= view.y && a.y < view.y + VIEW_H).map((a, i) => {
-              const vis = visibilityAt(fog, state.player.x, state.player.y, a.x, a.y);
-              if (vis < 2) return null;
-              return (
-                <div key={`a-${i}`} className="absolute flex items-center justify-center pointer-events-none"
-                  style={{
-                    left: (a.x - view.x) * TILE, top: (a.y - view.y) * TILE, width: TILE, height: TILE, fontSize: 22,
-                    transition: 'left 0.3s, top 0.3s',
-                  }}>
-                  {a.type === 'rabbit' && '🐰'}
-                  {a.type === 'wolf' && '🐺'}
-                  {a.type === 'boar' && '🐗'}
-                  {a.type === 'bear' && '🐻'}
-                  {a.type === 'deer' && '🦌'}
-                  {a.type === 'seal' && '🦭'}
-                  {a.type === 'raven' && '🦅'}
-                </div>
-              );
-            })}
-
-            <div className="absolute flex items-center justify-center pointer-events-none z-10"
-              style={{
-                left: (state.player.x - view.x) * TILE,
-                top: (state.player.y - view.y) * TILE + (moveTarget ? Math.sin(playerBob * 0.3) * 2 : 0),
-                width: TILE, height: TILE, fontSize: 26,
-                transition: 'left 0.2s, top 0.2s',
-                filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.5))',
-              }}>
-              {PROFESSIONS[state.profession].playerEmoji}
-            </div>
-
-            {moveTarget && (
-              <div className="absolute border-2 border-yellow-400 pointer-events-none animate-pulse"
-                style={{ left: (moveTarget.x - view.x) * TILE, top: (moveTarget.y - view.y) * TILE, width: TILE, height: TILE }} />
-            )}
-
-            {selectedBuild && hover && (
-              <div className="absolute border-2 border-green-400 pointer-events-none flex items-center justify-center"
-                style={{
-                  left: (hover.x - view.x) * TILE, top: (hover.y - view.y) * TILE, width: TILE, height: TILE,
-                  background: 'rgba(0,255,0,0.2)', fontSize: 20,
-                }}>
-                {BUILDINGS[selectedBuild].emoji}
-              </div>
-            )}
-
-            {hitFlashes.map(f => {
-              if (f.x < view.x || f.x >= view.x + VIEW_W || f.y < view.y || f.y >= view.y + VIEW_H) return null;
-              const age = Date.now() - f.ts;
-              const opacity = Math.max(0, 1 - age / 500);
-              return (
-                <div key={`hf-${f.id}`} className="absolute pointer-events-none rounded"
-                  style={{
-                    left: (f.x - view.x) * TILE, top: (f.y - view.y) * TILE, width: TILE, height: TILE,
-                    background: f.color === 'red' ? `rgba(255,40,40,${opacity * 0.6})` : `rgba(255,255,255,${opacity * 0.7})`,
-                    mixBlendMode: 'screen',
-                  }} />
-              );
-            })}
-
-            {state.eventEffects.aurora && (state.time < 6 || state.time > 19) && (
-              <div className="absolute inset-0 pointer-events-none" style={{
-                background: 'linear-gradient(180deg, rgba(80,255,180,0.18) 0%, rgba(120,100,255,0.12) 30%, transparent 60%)',
-                animation: 'auroraShift 6s ease-in-out infinite alternate',
-                mixBlendMode: 'screen',
-              }} />
-            )}
-
-            {snowflakes.map(f => (
-              <div key={`sf-${f.id}`} className="absolute pointer-events-none rounded-full"
-                style={{
-                  left: f.x, top: f.y, width: f.size, height: f.size,
-                  background: `rgba(255,255,255,${f.opacity})`,
-                }} />
-            ))}
-
-            <div className="absolute inset-0 pointer-events-none" style={{ background: skyColor }}></div>
-            <div className="absolute inset-0 pointer-events-none" style={{ background: weatherOverlay }}></div>
-
-            {state.buildings.filter(b => b.type === 'campfire' && b.fuel > 0
-                && b.x >= view.x - 8 && b.x < view.x + VIEW_W + 8
-                && b.y >= view.y - 8 && b.y < view.y + VIEW_H + 8).map((b, i) => {
-              const vis = visibilityAt(fog, state.player.x, state.player.y, b.x, b.y);
-              if (vis === 0) return null;
-              return (
-                <div key={`glow-${i}`} className="absolute pointer-events-none" style={{
-                  left: (b.x - view.x) * TILE + TILE / 2 - TILE * 8,
-                  top: (b.y - view.y) * TILE + TILE / 2 - TILE * 8,
-                  width: TILE * 16, height: TILE * 16,
-                  background: 'radial-gradient(circle, rgba(255,190,90,0.75) 0%, rgba(255,150,55,0.5) 20%, rgba(255,120,40,0.22) 45%, rgba(255,90,30,0.06) 70%, rgba(255,80,30,0) 90%)',
-                  animation: 'glowPulse 2s ease-in-out infinite',
-                  opacity: vis === 2 ? 1 : 0.5,
-                }} />
-              );
-            })}
-
-            {nearbyPredator && (
-              <div className="absolute top-2 right-2 pointer-events-none">
-                {nearbyPredator === 'bear' ? (
-                  <div className="bg-red-900/90 border-2 border-red-500 rounded px-3 py-2 text-sm font-bold text-red-100 animate-pulse shadow-lg shadow-red-500/50">
-                    <span className="text-2xl mr-1">🐻</span> BEAR NEARBY — RUN
-                  </div>
-                ) : (
-                  <div className="bg-red-900/80 border border-red-600 rounded px-2 py-1 text-xs font-bold text-red-200 shadow-lg shadow-red-500/30">
-                    🐺 Wolf nearby!
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tooltipReady && hover && (() => {
-              const tile = map[hover.y] && map[hover.y][hover.x];
-              if (tile === undefined) return null;
-              const key = `${hover.x},${hover.y}`;
-              const lc = state.lootCounts || {};
-              const remaining = key in lc ? lc[key] : LOOT_BUDGET[tile];
-              let text = null;
-              if (tile === T.TREE) text = '🌲 Tree — Click to chop for wood';
-              else if (tile === T.ROCK) text = '🪨 Rock — Click to mine for stone';
-              else if (tile === T.PLANE) text = remaining > 0 ? `✈️ Plane Wreckage — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
-              else if (tile === T.CABIN) text = remaining > 0 ? `🏚️ Abandoned Cabin — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
-              else if (tile === T.CAVE) text = '🕳️ Cave — Walkable shelter';
-              else if (tile === T.TOWER) text = '📡 Radio Tower — Reach with 10 food, 5 wood, coat to win';
-              if (!text) return null;
-              const left = (hover.x - view.x) * TILE + TILE + 4;
-              const top = (hover.y - view.y) * TILE - 4;
-              const right = left + 220 > VIEW_W * TILE;
-              return (
-                <div className="absolute pointer-events-none z-30" style={{
-                  left: right ? undefined : left,
-                  right: right ? VIEW_W * TILE - ((hover.x - view.x) * TILE) + 4 : undefined,
-                  top,
-                  maxWidth: 220,
-                }}>
-                  <div className="bg-slate-900/95 border border-slate-600 rounded px-2 py-1 text-xs text-slate-100 shadow-lg whitespace-nowrap">
-                    {text}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-          </div>
+          <MapView
+            state={state} map={map} view={view} fog={fog} mapScale={mapScale}
+            snowflakes={snowflakes} hitFlashes={hitFlashes} footprints={footprints}
+            screenShake={screenShake} playerBob={playerBob} moveTarget={moveTarget}
+            hover={hover} setHover={setHover}
+            tooltipReady={tooltipReady} selectedBuild={selectedBuild}
+            onTileClick={handleTileClick}
+          />
 
           <div className="flex flex-col gap-1 w-72 flex-shrink-0 min-h-0">
             <div className="bg-slate-800 p-1 grid grid-cols-2 gap-1 text-xs flex-shrink-0">
@@ -1372,14 +929,7 @@ export default function WintersEdge() {
               <button onClick={() => setMenu(menu === 'help' ? null : 'help')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[H] Help</button>
             </div>
 
-            <div className="bg-slate-800 p-2 text-xs flex-1 overflow-y-auto min-h-0">
-              <div className="font-bold mb-1 text-sky-300">📜 Log</div>
-              {state.log.slice(0, 30).map((l, i) => (
-                <div key={i} className="text-slate-300 mb-0.5">
-                  <span className="text-slate-500">D{l.day} {l.time}h:</span> {l.msg}
-                </div>
-              ))}
-            </div>
+            <LogPanel log={state.log} />
           </div>
         </div>
 
@@ -1397,131 +947,39 @@ export default function WintersEdge() {
               </div>
               <div className="p-3 text-xs">
                 {menu === 'build' && (
-                  <>
-                    <div className="text-slate-400 mb-2">Click a building, then click a snow tile on the map.</div>
-                    {Object.entries(BUILDINGS).map(([key, b]) => {
-                      const canBuild = state.inventory.wood >= b.wood && state.inventory.stone >= b.stone && state.inventory.scrap >= b.scrap;
-                      return (
-                        <button key={key} onClick={() => { setSelectedBuild(key === selectedBuild ? null : key); setMenu(null); }} disabled={!canBuild}
-                          className={`w-full text-left p-2 mb-1 rounded ${selectedBuild === key ? 'bg-sky-600' : canBuild ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-700/50 text-slate-500'}`}>
-                          <div className="font-bold">{b.emoji} {b.name}</div>
-                          <div className="text-slate-300">{b.wood > 0 && `🪵${b.wood} `}{b.stone > 0 && `🪨${b.stone} `}{b.scrap > 0 && `🔧${b.scrap}`}</div>
-                          <div className="text-slate-400">{b.desc}</div>
-                        </button>
-                      );
-                    })}
-                  </>
+                  <BuildMenu inventory={state.inventory} selectedBuild={selectedBuild}
+                    onSelectBuild={(k) => { setSelectedBuild(k === selectedBuild ? null : k); setMenu(null); }} />
                 )}
                 {menu === 'inventory' && (
-                  <>
-                    <div className="text-slate-300 mb-2">
-                      Gear: {state.equipment.hasKnife && '🔪'} {state.equipment.hasCoat && '🧥'}
-                      {state.inventory.fur_coat > 0 && ' 🧥+'}
-                      {state.inventory.hatchet > 0 && ' 🪓'}
-                      {state.inventory.hunting_bow > 0 && ' 🏹'}
-                      {state.inventory.rifle > 0 && ' 🎯'}
-                    </div>
-                    <div className="space-y-1">
-                      <ResourceRow icon="🪵" name="Wood" count={state.inventory.wood} />
-                      <ResourceRow icon="🪨" name="Stone" count={state.inventory.stone} />
-                      <ResourceRow icon="🔧" name="Scrap" count={state.inventory.scrap} />
-                      <ResourceRow icon="🧵" name="Cloth" count={state.inventory.cloth} />
-                      <ResourceRow icon="🦊" name="Pelts" count={state.inventory.pelts} />
-                      {state.inventory.rare_pelt > 0 && <ResourceRow icon="🐻" name="Bear Pelt" count={state.inventory.rare_pelt} />}
-                      <ResourceRow icon="🥫" name="Rations" count={state.inventory.food} action={state.inventory.food > 0 && (() => eat('food'))} actionLabel="Eat +30" />
-                      <ResourceRow icon="🍖" name="Raw Meat" count={state.inventory.raw_meat} action={state.inventory.raw_meat > 0 && (() => eat('raw_meat'))} actionLabel="Eat +15" />
-                      <ResourceRow icon="🍗" name="Cooked" count={state.inventory.cooked_meat} action={state.inventory.cooked_meat > 0 && (() => eat('cooked_meat'))} actionLabel="Eat +40" />
-                      {state.inventory.dried_meat > 0 && <ResourceRow icon="🥓" name="Dried Meat" count={state.inventory.dried_meat} action={() => eat('dried_meat')} actionLabel="Eat +35" />}
-                      <ResourceRow icon="🟡" name="Fat" count={state.inventory.fat} action={state.inventory.fat > 0 && (() => eat('fat'))} actionLabel="Eat +25🔥" />
-                      {state.inventory.medkit > 0 && <ResourceRow icon="🏥" name="Medkit" count={state.inventory.medkit} action={() => eat('medkit')} actionLabel="Heal" />}
-                    </div>
-                    <div className="mt-2 text-slate-400 border-t border-slate-700 pt-2">
-                      💡 Cook: click an active campfire while you have raw meat.
-                    </div>
-                  </>
+                  <InventoryMenu equipment={state.equipment} inventory={state.inventory} onEat={eat} />
                 )}
-                {menu === 'skills' && (
-                  <>
-                    <SkillRow name="Foraging" lvl={state.skills.foraging} xp={state.skills.foragingXp} max={state.skills.foraging * 30} desc="More wood per chop" />
-                    <SkillRow name="Hunting" lvl={state.skills.hunting} xp={state.skills.huntingXp} max={state.skills.hunting * 30} desc="More attack damage" />
-                    <SkillRow name="Crafting" lvl={state.skills.crafting} xp={state.skills.craftingXp} max={state.skills.crafting * 30} desc="(More uses coming)" />
-                  </>
-                )}
-                {menu === 'help' && (
-                  <div className="space-y-1">
-                    <div><b>Goal:</b> {SCENARIOS[state.scenario].desc}</div>
-                    <div className="border-t border-slate-700 pt-1 mt-1">
-                      <div><b>Click</b> tiles to move/interact.</div>
-                      <div><b>Trees</b>→wood. <b>Rocks</b>→stone. <b>Plane/Cabin</b>→loot.</div>
-                      <div><b>Animals</b> (adjacent)→attack.</div>
-                      <div><b>Campfire + raw meat</b>→click to cook.</div>
-                      <div><b>Tent</b> at night→sleep.</div>
-                    </div>
-                    <div className="border-t border-slate-700 pt-1">
-                      <b>Keys:</b> B I K H, Space=Pause, 1/2/3=Speed, Esc=Cancel
-                    </div>
-                  </div>
-                )}
+                {menu === 'skills' && <SkillsMenu skills={state.skills} />}
+                {menu === 'help' && <HelpMenu scenario={state.scenario} />}
               </div>
             </div>
           </div>
         )}
 
-        {dayBanner && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
-            <div className="bg-black/60 backdrop-blur-sm border border-amber-700/50 rounded-lg px-10 py-6 text-center animate-pulse">
-              <div className="text-5xl font-bold text-amber-300 tracking-widest">DAY {dayBanner.day}</div>
-              {dayBanner.event && <div className="text-slate-300 italic text-sm mt-2">{dayBanner.event}</div>}
-            </div>
-          </div>
-        )}
+        <DayBanner banner={dayBanner} />
 
-        {state.showIntro && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="bg-slate-900/95 border-2 border-amber-700/60 rounded-lg shadow-2xl max-w-lg w-[90%] p-6">
-              <div className="text-center mb-4">
-                <div className="text-3xl mb-1">{PROFESSIONS[state.profession].playerEmoji}</div>
-                <div className="text-amber-400/80 text-xs tracking-widest uppercase">Day 1 · {state.crashSiteName}</div>
-              </div>
-              <p className="text-slate-200 italic text-base leading-relaxed mb-5 text-center">
-                The plane went down at dawn. {state.player.name} the {PROFESSIONS[state.profession].name} crawls from the wreckage — alive, cold, alone.
-                {' '}
-                {state.scenario === 'rescue'
-                  ? 'Thirty days until rescue. Maybe.'
-                  : 'The radio tower is the only way out. Reach it before the cold takes you.'}
-              </p>
-              <div className="bg-slate-800/60 border border-slate-700 rounded p-3 mb-5 text-xs space-y-1 text-slate-300">
-                <div>🖱️ Click tiles to move and interact</div>
-                <div>🔥 Build a campfire FAST — warmth kills you quickly</div>
-                <div>⛺ Build a tent so you can sleep through the night</div>
-              </div>
-              <button
-                onClick={() => setState(s => ({ ...s, showIntro: false, paused: false }))}
-                className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-lg font-bold text-lg">
-                Begin
-              </button>
-            </div>
-          </div>
-        )}
+        <IntroOverlay
+          show={state.showIntro}
+          crashSiteName={state.crashSiteName}
+          playerName={state.player.name}
+          profession={state.profession}
+          scenario={state.scenario}
+          onBegin={() => setState(s => ({ ...s, showIntro: false, paused: false }))}
+        />
 
-        {(state.dead || state.rescued) && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-            <div className="bg-slate-800 p-8 rounded-lg border border-slate-600 text-center max-w-md">
-              <div className="text-4xl mb-3">{state.rescued ? (state.scenario === 'tower' ? '📡' : '🚁') : '💀'}</div>
-              <div className="text-2xl font-bold mb-2">{state.rescued ? 'SURVIVED' : 'YOU DIED'}</div>
-              {state.dead && state.deathCause && (
-                <div className="text-red-300 italic text-sm mb-2">{state.deathCause}</div>
-              )}
-              <div className="text-slate-300 mb-4">
-                {state.player.name} the {PROFESSIONS[state.profession].name}<br/>
-                {state.rescued ? `Made it on day ${state.day}.` : `Survived ${state.day} days.`}
-              </div>
-              <button onClick={() => { clearSave(); setSavedGameMeta(null); setGameStarted(false); setSetupStep('scenario'); }} className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded">
-                New Game
-              </button>
-            </div>
-          </div>
-        )}
+        <DeathScreen
+          dead={state.dead} rescued={state.rescued}
+          scenario={state.scenario}
+          playerName={state.player.name}
+          profession={state.profession}
+          day={state.day}
+          deathCause={state.deathCause}
+          onNewGame={() => { clearSave(); setSavedGameMeta(null); setGameStarted(false); setSetupStep('scenario'); }}
+        />
       </div>
     </div>
   );
