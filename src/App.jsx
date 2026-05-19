@@ -6,6 +6,10 @@ const MAP_H = 45;
 const VIEW_W = 20;
 const VIEW_H = 15;
 const VISION_RADIUS = 5;
+// WC3-style day/night cycle: 1 in-game day = 480 real seconds at gameSpeed 1x.
+// All in-game-time-dependent rates (hunger, warmth, HP env, fuel, regrowth)
+// multiply by TIME_SCALE so they stretch with the longer day.
+const TIME_SCALE = 0.025;
 
 const T = {
   SNOW: 0, TREE: 1, ROCK: 2, ICE: 3, WATER: 4,
@@ -574,7 +578,7 @@ export default function WintersEdge() {
         let s = { ...prev };
         const prof = PROFESSIONS[s.profession];
 
-        s.time = s.time + 0.2 * s.gameSpeed;
+        s.time = s.time + 0.2 * s.gameSpeed * TIME_SCALE;
         if (s.time >= 24) {
           s.time = s.time - 24;
           s.day += 1;
@@ -658,18 +662,18 @@ export default function WintersEdge() {
         if (s.inventory.fur_coat > 0) warmthDelta += 0.3;
         if (prof.mods.warmthRetention && warmthDelta < 0) warmthDelta *= prof.mods.warmthRetention;
         if (s.day <= 3 && warmthDelta < 0) warmthDelta *= 0.8;
-        s.player.warmth = Math.max(0, Math.min(100, s.player.warmth + warmthDelta));
+        s.player.warmth = Math.max(0, Math.min(100, s.player.warmth + warmthDelta * TIME_SCALE));
 
-        const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1);
+        const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1) * TIME_SCALE;
         s.player.hunger = Math.max(0, s.player.hunger - hungerDrain);
         if (!moveTarget) s.player.stamina = Math.min(100, s.player.stamina + 0.5);
-        if (s.player.warmth < 20) s.player.hp = Math.max(0, s.player.hp - 0.5);
-        if (s.player.hunger < 15) s.player.hp = Math.max(0, s.player.hp - 0.3);
+        if (s.player.warmth < 20) s.player.hp = Math.max(0, s.player.hp - 0.5 * TIME_SCALE);
+        if (s.player.hunger < 15) s.player.hp = Math.max(0, s.player.hp - 0.3 * TIME_SCALE);
         const regenThreshold = s.eventEffects.thaw ? 50 : 60;
         if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp < 100) {
           let regenAmount = s.eventEffects.thaw ? 0.4 : 0.2;
           if (prof.mods.hpRegenBonus) regenAmount *= prof.mods.hpRegenBonus;
-          s.player.hp = Math.min(100, s.player.hp + regenAmount);
+          s.player.hp = Math.min(100, s.player.hp + regenAmount * TIME_SCALE);
         }
 
         if (s.player.hp <= 0) {
@@ -688,7 +692,7 @@ export default function WintersEdge() {
 
         s.buildings = s.buildings.map(b => {
           if (b.type === 'campfire' && b.fuel > 0) {
-            const newFuel = b.fuel - 0.05 * s.gameSpeed;
+            const newFuel = b.fuel - 0.05 * s.gameSpeed * TIME_SCALE;
             if (newFuel <= 0 && b.fuel > 0) s = addLog(s, '🔥 Campfire went out.');
             return { ...b, fuel: Math.max(0, newFuel) };
           }
@@ -703,7 +707,7 @@ export default function WintersEdge() {
 
         const newTrees = { ...s.trees };
         for (const key in newTrees) {
-          newTrees[key] -= 0.2 * s.gameSpeed / 24;
+          newTrees[key] -= 0.2 * s.gameSpeed * TIME_SCALE / 24;
           if (newTrees[key] <= 0) {
             const parts = key.split(',');
             const tx = Number(parts[0]), ty = Number(parts[1]);
@@ -1310,7 +1314,7 @@ export default function WintersEdge() {
   if (state.time < 5) skyColor = 'rgba(15, 25, 55, 0.6)';
   else if (state.time < 6) skyColor = 'rgba(60, 50, 90, 0.4)';
   else if (state.time < 7) skyColor = 'rgba(255, 150, 90, 0.18)';
-  else if (state.time < 17) skyColor = 'rgba(0,0,0,0)';
+  else if (state.time < 18) skyColor = 'rgba(255, 230, 150, 0.06)';
   else if (state.time < 19) skyColor = 'rgba(255, 130, 80, 0.22)';
   else if (state.time < 21) skyColor = 'rgba(60, 50, 90, 0.45)';
   else skyColor = 'rgba(15, 25, 55, 0.55)';
