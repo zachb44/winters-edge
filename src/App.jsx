@@ -1,131 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { T, CRASH_SITES, TILE_DATA } from './data/tiles.js';
+import { TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, VISION_RADIUS, TIME_SCALE } from './constants.js';
+import { T, TILE_DATA } from './data/tiles.js';
 import { BUILDINGS } from './data/buildings.js';
 import { SCENARIOS } from './data/scenarios.js';
 import { PROFESSIONS } from './data/professions.js';
-import { ITEM_INFO, rollFromTable } from './data/loot.js';
+import { ITEM_INFO, LOOT_BUDGET, rollFromTable } from './data/loot.js';
 import { rollDailyEvent } from './data/events.js';
-
-const TILE = 32;
-const MAP_W = 60;
-const MAP_H = 45;
-const VIEW_W = 20;
-const VIEW_H = 15;
-const VISION_RADIUS = 5;
-// WC3-style day/night cycle: 1 in-game day = 480 real seconds at gameSpeed 1x.
-// All in-game-time-dependent rates (hunger, warmth, HP env, fuel, regrowth)
-// multiply by TIME_SCALE so they stretch with the longer day.
-const TIME_SCALE = 0.025;
-
-function genMap(crashSite = null) {
-  const map = Array(MAP_H).fill(null).map(() => Array(MAP_W).fill(T.SNOW));
-
-  for (let y = 8; y < 20; y++) {
-    for (let x = 4; x < 18; x++) {
-      const dx = x - 11, dy = y - 14;
-      if (dx*dx + dy*dy < 32) map[y][x] = T.ICE;
-    }
-  }
-  for (let x = 16; x < 32; x++) {
-    map[13][x] = T.ICE; map[14][x] = T.ICE; map[15][x] = T.ICE;
-  }
-  for (let y = 3; y < 16; y++) {
-    for (let x = 38; x < 58; x++) {
-      const dx = x - 48, dy = y - 9;
-      const d = Math.sqrt(dx*dx + dy*dy);
-      if (d > 4 && d < 8 && Math.random() > 0.15) map[y][x] = T.TREE;
-    }
-  }
-  for (let y = 30; y < 42; y++) {
-    for (let x = 14; x < 32; x++) {
-      const dx = x - 23, dy = y - 36;
-      const d = Math.sqrt(dx*dx + dy*dy);
-      if (d > 3 && d < 6.5 && Math.random() > 0.35) map[y][x] = T.ROCK;
-    }
-  }
-  for (let y = 33; y < 43; y++) {
-    for (let x = 44; x < 56; x++) {
-      if (Math.random() > 0.55) map[y][x] = T.ROCK;
-    }
-  }
-  map[38][50] = T.CAVE;
-  for (let y = 2; y < 12; y++) {
-    for (let x = 2; x < 14; x++) {
-      if (Math.random() > 0.6) map[y][x] = T.TREE;
-    }
-  }
-  for (let i = 0; i < 150; i++) {
-    const x = Math.floor(Math.random() * MAP_W);
-    const y = Math.floor(Math.random() * MAP_H);
-    if (map[y][x] === T.SNOW) map[y][x] = T.TREE;
-  }
-  for (let i = 0; i < 40; i++) {
-    const x = Math.floor(Math.random() * MAP_W);
-    const y = Math.floor(Math.random() * MAP_H);
-    if (map[y][x] === T.SNOW) map[y][x] = T.ROCK;
-  }
-
-  const site = crashSite || CRASH_SITES[Math.floor(Math.random() * CRASH_SITES.length)];
-  const startX = site.x, startY = site.y;
-
-  for (let y = startY - 2; y <= startY + 2; y++) {
-    for (let x = startX - 2; x <= startX + 3; x++) {
-      if (map[y] && (map[y][x] === T.TREE || map[y][x] === T.ROCK || map[y][x] === T.ICE)) {
-        map[y][x] = T.SNOW;
-      }
-    }
-  }
-  map[startY][startX] = T.PLANE;
-  if (map[startY] && map[startY][startX + 1] !== undefined) map[startY][startX + 1] = T.PLANE;
-  if (map[startY - 1] && map[startY - 1][startX] !== undefined) map[startY - 1][startX] = T.PLANE;
-
-  map[6][35] = T.CABIN;
-  map[5][7] = T.CABIN;
-  map[40][3] = T.TOWER;
-  for (let y = 38; y <= 42; y++) {
-    for (let x = 1; x <= 5; x++) {
-      if (map[y] && (map[y][x] === T.TREE || map[y][x] === T.ROCK)) map[y][x] = T.SNOW;
-    }
-  }
-  map[40][3] = T.TOWER;
-
-  return { map, startX, startY, siteName: site.name };
-}
-
-const SAVE_KEY = 'wintersedge.save.v1';
-
-function saveGame(state, map, fog) {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ ts: Date.now(), state, map, fog }));
-  } catch (e) {
-    console.warn('Save failed:', e);
-  }
-}
-
-function loadGame() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') { clearSave(); return null; }
-    const { state, map, fog } = data;
-    if (!state || !state.player || typeof state.day !== 'number'
-        || !PROFESSIONS[state.profession]
-        || !Array.isArray(map) || !Array.isArray(fog)) {
-      clearSave();
-      return null;
-    }
-    return data;
-  } catch {
-    clearSave();
-    return null;
-  }
-}
-
-function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); } catch {}
-}
-
+import { genMap } from './logic/mapGen.js';
+import { visibilityAt } from './logic/visibility.js';
+import { spawnInitialAnimals } from './logic/animals.js';
+import { applyAttack } from './logic/combat.js';
+import { gainXp } from './logic/progression.js';
+import { pushLog } from './logic/log.js';
 const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
   const prof = PROFESSIONS[profession];
   const baseInv = {
@@ -165,14 +51,6 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
     deathCause: null,
   };
 };
-
-const LOOT_BUDGET = { [T.PLANE]: 3, [T.CABIN]: 4 };
-
-function visibilityAt(fog, px, py, x, y) {
-  const dx = x - px, dy = y - py;
-  if (dx*dx + dy*dy <= VISION_RADIUS * VISION_RADIUS) return 2;
-  return fog[y] && fog[y][x] ? 1 : 0;
-}
 
 export default function WintersEdge() {
   const [gameStarted, setGameStarted] = useState(false);
@@ -223,33 +101,6 @@ export default function WintersEdge() {
   }, []);
   const flashIdRef = useRef(0);
   const lastHpRef = useRef(100);
-
-  const spawnInitialAnimals = useCallback(() => {
-    return [
-      { type: 'rabbit', x: 42, y: 8, hp: 10, hostile: false },
-      { type: 'rabbit', x: 20, y: 28, hp: 10, hostile: false },
-      { type: 'rabbit', x: 50, y: 18, hp: 10, hostile: false },
-      { type: 'rabbit', x: 35, y: 25, hp: 10, hostile: false },
-      { type: 'rabbit', x: 25, y: 15, hp: 10, hostile: false },
-      { type: 'rabbit', x: 15, y: 32, hp: 10, hostile: false },
-      { type: 'rabbit', x: 45, y: 22, hp: 10, hostile: false },
-      { type: 'deer', x: 48, y: 6, hp: 20, hostile: false },
-      { type: 'deer', x: 52, y: 11, hp: 20, hostile: false },
-      { type: 'deer', x: 44, y: 14, hp: 20, hostile: false },
-      { type: 'wolf', x: 52, y: 25, hp: 25, hostile: true },
-      { type: 'wolf', x: 10, y: 30, hp: 25, hostile: true },
-      { type: 'wolf', x: 8, y: 38, hp: 25, hostile: true },
-      { type: 'boar', x: 22, y: 35, hp: 35, hostile: true, aggro: false },
-      { type: 'boar', x: 28, y: 38, hp: 35, hostile: true, aggro: false },
-      { type: 'bear', x: 50, y: 38, hp: 80, hostile: true, territorial: true, homeX: 50, homeY: 38 },
-      { type: 'seal', x: 11, y: 14, hp: 15, hostile: false },
-      { type: 'seal', x: 9, y: 17, hp: 15, hostile: false },
-      { type: 'seal', x: 13, y: 11, hp: 15, hostile: false },
-      { type: 'raven', x: 30, y: 10, hp: 5, hostile: false },
-      { type: 'raven', x: 40, y: 30, hp: 5, hostile: false },
-      { type: 'raven', x: 5, y: 5, hp: 5, hostile: false },
-    ];
-  }, []);
 
   const startGame = (scenario, profession, name) => {
     const md = genMap();
@@ -308,10 +159,7 @@ export default function WintersEdge() {
     });
   }, [state.player.x, state.player.y, gameStarted]);
 
-  const addLog = useCallback((s, msg) => ({
-    ...s,
-    log: [{ msg, day: s.day, time: Math.floor(s.time) }, ...s.log].slice(0, 50),
-  }), []);
+  const addLog = useCallback(pushLog, []);
 
   // Visual effects loop
   useEffect(() => {
@@ -765,12 +613,7 @@ export default function WintersEdge() {
         const earlyBonus = s.day <= 3 ? 1 : 0;
         const amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus) + earlyBonus;
         s.inventory.wood += amount;
-        s.skills.foragingXp += 5;
-        if (s.skills.foragingXp >= s.skills.foraging * 30) {
-          s.skills.foraging += 1;
-          s.skills.foragingXp = 0;
-          s = addLog(s, `🌟 Foraging Lv ${s.skills.foraging}!`);
-        }
+        s = gainXp(s, 'foraging', 5);
         s.player.stamina = Math.max(0, s.player.stamina - 8);
         s = addLog(s, `🪓 Chopped wood (+${amount})`);
         setMap(m => { const nm = m.map(r => [...r]); nm[ty][tx] = T.SNOW; return nm; });
@@ -846,54 +689,7 @@ export default function WintersEdge() {
       id: flashIdRef.current++,
       x: animal.x, y: animal.y, color: 'white', ts: Date.now(),
     }]);
-    setState(prev => {
-      let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
-      const prof = PROFESSIONS[s.profession];
-      let dmg = 8 + Math.floor(s.skills.hunting * 2) + (s.equipment.hasKnife ? 4 : 0);
-      if (prof.mods.huntingDmgBonus && ['rabbit','deer','wolf','boar','bear','seal','raven'].includes(animal.type)) {
-        dmg = Math.floor(dmg * prof.mods.huntingDmgBonus);
-      }
-      if (prof.mods.combatBonus) dmg = Math.floor(dmg * prof.mods.combatBonus);
-      if (prof.mods.combatPenalty) dmg = Math.floor(dmg * prof.mods.combatPenalty);
-      if (s.inventory.rifle > 0) dmg += 15;
-      else if (s.inventory.hunting_bow > 0) dmg += 8;
-      else if (s.inventory.hatchet > 0) dmg += 5;
-
-      const newAnimals = s.animals.map(a => {
-        if (a === animal) {
-          const newHp = a.hp - dmg;
-          if (newHp <= 0) {
-            if (a.type === 'rabbit') { s.inventory.raw_meat += 1; s = addLog(s, '🐰 Killed rabbit (+1 raw meat)'); }
-            else if (a.type === 'wolf') { s.inventory.raw_meat += 2; s.inventory.pelts += 1; s = addLog(s, '🐺 Killed wolf (+2 meat, +1 pelt)'); }
-            else if (a.type === 'boar') { s.inventory.raw_meat += 4; s = addLog(s, '🐗 Killed boar (+4 meat)'); }
-            else if (a.type === 'bear') {
-              const drops = rollFromTable('bear');
-              let msg = '🐻 KILLED THE BEAR!';
-              for (const drop of drops) {
-                s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
-                msg += ` +${drop.qty}${ITEM_INFO[drop.item].icon}`;
-              }
-              s = addLog(s, msg);
-            }
-            else if (a.type === 'deer') { s.inventory.raw_meat += 5; s.inventory.pelts += 1; s = addLog(s, '🦌 Killed deer (+5 meat, +1 pelt)'); }
-            else if (a.type === 'seal') { s.inventory.raw_meat += 3; s.inventory.fat += 2; s = addLog(s, '🦭 Killed seal (+3 meat, +2 fat)'); }
-            else if (a.type === 'raven') { s.inventory.raw_meat += 1; s = addLog(s, '🦅 Killed raven (+1 meat)'); }
-            s.skills.huntingXp += 15;
-            if (s.skills.huntingXp >= s.skills.hunting * 30) {
-              s.skills.hunting += 1; s.skills.huntingXp = 0;
-              s = addLog(s, `🌟 Hunting Lv ${s.skills.hunting}!`);
-            }
-            return { ...a, hp: 0 };
-          }
-          if (a.type === 'boar') a.aggro = true;
-          return { ...a, hp: newHp };
-        }
-        return a;
-      });
-      s.animals = newAnimals.filter(a => a.hp > 0);
-      s.player.stamina = Math.max(0, s.player.stamina - 12);
-      return s;
-    });
+    setState(prev => applyAttack(prev, animal));
   };
 
   const placeBuilding = (tx, ty) => {
@@ -920,11 +716,7 @@ export default function WintersEdge() {
       if (selectedBuild === 'campfire') nb.fuel = 10;
       if (selectedBuild === 'trap') nb.caught = false;
       s.buildings = [...s.buildings, nb];
-      s.skills.craftingXp += 10;
-      if (s.skills.craftingXp >= s.skills.crafting * 30) {
-        s.skills.crafting += 1; s.skills.craftingXp = 0;
-        s = addLog(s, `🌟 Crafting Lv ${s.skills.crafting}!`);
-      }
+      s = gainXp(s, 'crafting', 10);
       s = addLog(s, `✅ Built ${BUILDINGS[selectedBuild].name}`);
       return s;
     });

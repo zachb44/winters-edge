@@ -1,3 +1,7 @@
+import { T } from './tiles.js';
+
+export const LOOT_BUDGET = { [T.PLANE]: 3, [T.CABIN]: 4 };
+
 export const LOOT_TABLES = {
   plane: {
     common: [['scrap',1,2,30],['food',1,1,25],['wood',1,3,20],['nothing',0,0,15]],

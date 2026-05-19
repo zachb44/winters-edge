@@ -1,0 +1,12 @@
+// Visual / map dimensions
+export const TILE = 32;
+export const MAP_W = 60;
+export const MAP_H = 45;
+export const VIEW_W = 20;
+export const VIEW_H = 15;
+export const VISION_RADIUS = 5;
+
+// WC3-style day/night cycle: 1 in-game day = 480 real seconds at gameSpeed 1x.
+// All in-game-time-dependent rates (hunger, warmth, HP env, fuel, regrowth)
+// multiply by TIME_SCALE so they stretch with the longer day.
+export const TIME_SCALE = 0.025;
