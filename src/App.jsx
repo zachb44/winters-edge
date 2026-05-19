@@ -12,6 +12,11 @@ import { spawnInitialAnimals } from './logic/animals.js';
 import { applyAttack } from './logic/combat.js';
 import { gainXp } from './logic/progression.js';
 import { pushLog } from './logic/log.js';
+import { saveGame, loadGame, clearSave } from './logic/saveLoad.js';
+import { Vital } from './components/shared/Vital.jsx';
+import { ResourceRow } from './components/shared/ResourceRow.jsx';
+import { SkillRow } from './components/shared/SkillRow.jsx';
+
 const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
   const prof = PROFESSIONS[profession];
   const baseInv = {
@@ -1522,41 +1527,3 @@ export default function WintersEdge() {
   );
 }
 
-function Vital({ label, value, color, warning, criticalLabel }) {
-  const critical = !!criticalLabel;
-  return (
-    <div className={`flex-1 min-w-32 ${critical ? 'p-1 -m-1 rounded ring-2 ring-red-500/70 animate-pulse' : warning ? 'animate-pulse' : ''}`}>
-      <div className="flex justify-between text-xs mb-0.5">
-        <span>{label}</span>
-        <span className="flex items-center gap-1">
-          {critical && <span className="text-red-300 text-[10px] font-bold">{criticalLabel}</span>}
-          <span>{Math.floor(value)}</span>
-        </span>
-      </div>
-      <div className="h-2 bg-slate-700 rounded overflow-hidden">
-        <div className={`h-full ${color} transition-all`} style={{ width: `${value}%` }}></div>
-      </div>
-    </div>
-  );
-}
-
-function ResourceRow({ icon, name, count, action, actionLabel }) {
-  return (
-    <div className="flex items-center justify-between bg-slate-700/50 p-1 rounded">
-      <span>{icon} {name}: <b>{count}</b></span>
-      {action && <button onClick={action} className="bg-sky-700 hover:bg-sky-600 px-2 py-0.5 rounded text-xs">{actionLabel}</button>}
-    </div>
-  );
-}
-
-function SkillRow({ name, lvl, xp, max, desc }) {
-  return (
-    <div className="mb-2">
-      <div className="flex justify-between"><span><b>{name}</b> Lv.{lvl}</span><span className="text-slate-400">{xp}/{max}</span></div>
-      <div className="h-1 bg-slate-700 rounded overflow-hidden">
-        <div className="h-full bg-sky-500" style={{ width: `${(xp/max)*100}%` }}></div>
-      </div>
-      <div className="text-slate-400 text-xs">{desc}</div>
-    </div>
-  );
-}
