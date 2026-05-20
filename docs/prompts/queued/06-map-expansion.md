@@ -147,6 +147,55 @@ In `src/logic/animals.js`, update `spawnInitialAnimals()` to distribute animals 
 - Seals: on/near the frozen lake at (~15, 15) (3-4 total)
 - Ravens: scattered, mostly decorative (3-4 total)
 
+## Hardcoded coordinates to update — COMPLETE INVENTORY
+
+⚠️ This is the most coordinate-heavy refactor in the project. Every hardcoded position must be updated. Here is the complete inventory:
+
+### `src/logic/mapGen.js` — terrain feature coordinates
+| Feature | Current coords | New coords |
+|---|---|---|
+| Frozen lake center | (~11, 14) | (~15, 15) |
+| Lake ice loops | x=4-18, y=8-20 | scale to ~20×16 at new center |
+| Ice river extension | x=16-32, y=13-15 | remove or reposition |
+| Forest crescent | x=38-58, y=3-16, center (48,9) | (~30, 55), radius 12-16 |
+| Boulder field 1 | x=14-32, y=30-42, center (23,36) | part of boulder maze (~85, 65) |
+| Boulder field 2 | x=44-56, y=33-43 | part of cave mountain (~100, 75) |
+| Cave entrance | (50, 38) | (~100, 75) |
+| Scatter forest | x=2-14, y=2-12 | redistribute across larger map |
+| Cabin 1 | (35, 6) | (~50, 10) — hilltop cabin |
+| Cabin 2 | (7, 5) | (~15, 20) — lake cabin (shore of frozen lake) |
+| Radio tower | (3, 40) | (~10, 80) |
+| Tower clearing zone | x=1-5, y=38-42 | adjust to new tower position |
+| Random trees | 150 count | ~600 count (4× area) |
+| Random rocks | 40 count | ~160 count (4× area) |
+
+### `src/logic/animals.js` — every spawn position
+| Animal | Current (x, y) | New target area |
+|---|---|---|
+| rabbit (7 total) | (42,8), (20,28), (50,18), (35,25), (25,15), (15,32), (45,22) | scatter across all 4 quadrants |
+| deer (3 total) | (48,6), (52,11), (44,14) | near tree crescent (~30, 55) and open tundra |
+| wolf (3 total) | (52,25), (10,30), (8,38) | wilderness areas, avoid outpost zone |
+| boar (2 total) | (22,35), (28,38) | southern half |
+| bear (1) | (50,38) homeX/homeY | (~100, 75) near cave — update homeX/homeY too |
+| seal (3 total) | (11,14), (9,17), (13,11) | on/near frozen lake (~15, 15) |
+| raven (3 total) | (30,10), (40,30), (5,5) | scatter across map |
+
+### `src/data/tiles.js` — crash sites
+Replace entire `CRASH_SITES` array (5 entries) with new positions as specified above.
+
+### `src/constants.js`
+- `MAP_W`: 60 → 120
+- `MAP_H`: 45 → 90
+
+### After implementation, verify:
+- No entity spawns outside the 120×90 bounds
+- No terrain feature overlaps with another named location
+- The radio tower is reachable by walking from any crash site
+- The cave has adjacent rocks
+- The bear's `homeX`/`homeY` matches the new cave position
+- Every cabin is on a walkable-adjacent tile
+- The outpost crash site puts the player within ~5 tiles of the outpost
+
 ## Step 3: Terrain generation rewrite
 
 The `genMap()` function needs a significant rewrite to place features on the larger map. The approach:
@@ -180,11 +229,19 @@ Search for any hardcoded references to `60` or `45` in the codebase that might b
 - `visibility.js` — fog of war grid size
 - `saveLoad.js` — map serialization
 
-## Save compatibility
+## Runtime references to MAP_W/MAP_H — SAVE COMPATIBILITY
 
-Old saves have a 60×45 map. New games generate 120×90. The save/load system serializes the full map array, so old saves will load with their original 60×45 map — that's fine. The `MAP_W`/`MAP_H` constants are used for new game generation and should not break old save rendering as long as the camera/viewport code reads map dimensions from the actual map array rather than the constants.
+⚠️ These files may use `MAP_W` or `MAP_H` at runtime (not just during map generation). For save compatibility with old 60×45 maps, **any runtime usage must read from the actual map dimensions** (`state.map[0].length` / `state.map.length`) instead of the constants. Check each one:
 
-**Check this carefully:** If `MapView.jsx` uses `MAP_W`/`MAP_H` for camera bounds instead of `map[0].length` / `map.length`, old saves will break. Fix any such references to read from the actual map data.
+- `src/components/MapView.jsx` — camera clamping, viewport edge detection
+- `src/logic/visibility.js` — fog of war grid initialization and bounds checking
+- `src/hooks/useGameLoop.js` — animal respawn at map edges, boundary collision checks, any edge-of-map logic
+- `src/logic/animals.js` — if respawn positions reference MAP_W/MAP_H
+- `src/logic/zombies.js` — edge spawn positions (seed 03's `getEdgeSpawnPositions` uses MAP_W/MAP_H)
+
+**Generation-time usage in `mapGen.js` is fine** — new games use the new constants. **Runtime usage must be dynamic** — read from the actual map array, not the constants.
+
+After fixing, test: load an old 60×45 save → camera should clamp correctly, fog of war should render at 60×45, no out-of-bounds errors. Then start a new game → map generates at 120×90.
 
 ## Acceptance criteria
 
@@ -200,6 +257,7 @@ Old saves have a 60×45 map. New games generate 120×90. The save/load system se
 - [ ] Old saves still load (60×45 maps render correctly)
 - [ ] Performance unchanged (viewport-only rendering confirmed)
 - [ ] Random terrain (scattered trees/rocks) fills the larger map proportionally
+- [ ] No hardcoded 60/45 references remain in runtime code
 
 ## Constraints
 
@@ -216,8 +274,10 @@ Commit message: `feat: expand map to 120×90 with 8 named base locations`
 2. Read `src/components/MapView.jsx` — camera clamping, viewport rendering, fog init
 3. Read `src/logic/visibility.js` — fog grid size
 4. Read `src/logic/animals.js` — current spawn positions
-5. Search for hardcoded 60/45 references across all `src/` files
-6. Propose the rewritten `genMap()` function structure
-7. Wait for go-ahead
-8. Implement: constants → mapGen rewrite → animal spawns → camera fixes → fog fixes → crash sites
-9. Walk through the map visually to confirm all locations render
+5. **Search for ALL hardcoded 60/45 references AND all MAP_W/MAP_H imports across `src/` files — list every hit**
+6. **Cross-reference the hardcoded coordinate inventory table above — confirm every entry is accounted for**
+7. Propose the rewritten `genMap()` function structure
+8. Wait for go-ahead
+9. Implement: constants → mapGen rewrite → animal spawns → camera fixes → fog fixes → crash sites → runtime MAP_W/MAP_H fixes
+10. Walk through the map visually to confirm all locations render
+11. **Test old save load to verify no out-of-bounds crashes**
