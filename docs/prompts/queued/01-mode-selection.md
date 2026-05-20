@@ -67,10 +67,15 @@ export const SCENARIOS = {
 };
 ```
 
-**Important:** Update all references to `SCENARIOS[key].name` and `SCENARIOS[key].desc` throughout the codebase to use the mode-aware format: `SCENARIOS[key].name[state.mode]` or fallback to a string check. Search for every usage of `SCENARIOS` in `src/` and update accordingly. Key places to check:
-- `SetupScreen.jsx` — scenario selection display
-- `App.jsx` — anywhere scenario name is rendered (day banner, win condition check, etc.)
-- `GameUI.jsx` — if scenario name appears in the UI
+**⚠️ CRITICAL — SCENARIOS references are a breaking change.** Changing `name` and `desc` from strings to objects will crash any code that renders them directly. You MUST update every reference. Here is the complete list of files to check:
+
+- `src/components/SetupScreen.jsx` — scenario card display renders `sc.name` and `sc.desc`
+- `src/App.jsx` — win condition check (may compare scenario name or key), game initialization, any scenario name rendering in the UI
+- `src/components/GameUI.jsx` — if scenario name appears in the top bar or status area
+- `src/components/DayBanner.jsx` — if day banner text references scenario name
+- `src/components/DeathScreen.jsx` — if death screen displays which scenario was being played
+
+**After updating all references, run this verification:** grep the entire `src/` directory for `.name` and `.desc` on any SCENARIOS usage. Confirm no raw object references remain. The game must NOT render `[object Object]` anywhere. If a reference uses `SCENARIOS[key].name` without indexing by mode, it will display `[object Object]` — this is the most common mistake.
 
 ### Step 3: Update SetupScreen.jsx
 
@@ -100,6 +105,8 @@ Add a new `'mode'` step as the first screen. The `setupStep` state should defaul
 ### Step 4: Store mode in game state
 
 Add `state.mode` (string: `'wilderness'` or `'outbreak'`) to the game state object. Set it during `onStartGame`. It must persist through save/load.
+
+The current `onStartGame` signature is `onStartGame(chosenScenario, chosenProfession, charName)`. Add `chosenMode` as the first parameter: `onStartGame(chosenMode, chosenScenario, chosenProfession, charName)`. Update the call site in `SetupScreen.jsx` and the handler in `App.jsx` to pass and receive the mode. Set `state.mode = chosenMode` in the game initialization block.
 
 **In `src/logic/saveLoad.js`:** Add `mode: 'wilderness'` as the default migration value for older saves that don't have it.
 
@@ -145,6 +152,7 @@ This seed is purely: mode selection UI + data structures + state persistence. Th
 - [ ] Scenario names/descriptions change based on selected mode
 - [ ] All existing functionality unchanged — no gameplay differences yet
 - [ ] `src/data/modes.js` and `src/data/modeConfig.js` exist with correct data
+- [ ] No `[object Object]` rendering anywhere — all SCENARIOS references updated
 
 ## Constraints
 
@@ -157,8 +165,9 @@ Commit message: `feat: mode selection screen (Wilderness vs Outbreak) in charact
 ## Plan before executing
 
 1. Read `src/components/SetupScreen.jsx`, `src/data/scenarios.js`, `src/logic/saveLoad.js`
-2. Search for all `SCENARIOS` references in `src/`
+2. **Grep `src/` for every import or reference to `SCENARIOS` — list every file and line that accesses `.name` or `.desc`**
 3. Propose the flow changes
 4. Wait for go-ahead
-5. Implement: modes.js + modeConfig.js → scenarios.js update → SetupScreen.jsx → saveLoad migration → state.mode wiring
+5. Implement: modes.js + modeConfig.js → scenarios.js update → **update ALL SCENARIOS references** → SetupScreen.jsx → saveLoad migration → state.mode wiring
 6. Verify old saves still load
+7. **Final check: grep for `.name` and `.desc` on SCENARIOS — confirm no raw object rendering**
