@@ -91,37 +91,35 @@ These are the next prompts that can be pasted into Claude Code. See `docs/prompt
 
 This is the critical path. Everything else waits until Outbreak Mode is playable.
 
-1. **Mode selection screen** — Update character creation to add Mode → Scenario two-step selection. Wilderness Mode uses existing systems unchanged. Outbreak Mode sets reduced hunger/warmth drain rates and enables zombie spawning.
+1. **Mode selection screen** — `01-mode-selection.md` — Update character creation to add Mode → Scenario two-step selection. Wilderness Mode uses existing systems unchanged. Outbreak Mode sets reduced hunger/warmth drain rates and enables zombie spawning.
 
-2. **Basic zombie enemy (shambler)** — First zombie type. Slow, predictable, moderate HP. Spawns at map edges at sundown. Uses existing combat system (auto-attack engagement). Distinct from animals in appearance and behavior.
+2. **Basic zombie enemy (shambler)** — `02-shambler-zombie.md` — First zombie type. Slow, predictable, moderate HP. Spawns at map edges at sundown. Uses existing combat system (auto-attack engagement). Distinct from animals in appearance and behavior. *Depends on: 01*
 
-3. **Wave system + night counter** — Zombie count scales with night number. Night 1 = small group, Night 30 = horde. Day banner changes to "NIGHT N" format at sundown. Win condition becomes "Survive 30 nights" in Outbreak Mode.
+3. **Wave system + night counter** — `03-wave-spawner.md` — Zombie count scales with night number. Night 1 = small group, Night 30 = horde. Day banner changes to "NIGHT N" format at sundown. Win condition becomes "Survive 30 nights" in Outbreak Mode. *Depends on: 01, 02*
 
-4. **Military outpost zone** — Add the outpost area to the map. Multiple buildings, sandbag walls, watchtower, armory. Near the crash site in Outbreak Mode. Justifies weapon/ammo abundance. Environmental storytelling (bullet holes, abandoned tents, half-built barricades).
+4. **Outbreak vitals rebalance** — `04-vitals-rebalance.md` — Wire mode-dependent hunger/warmth drain rates into the game loop (outbreak = 1/4 rate). *Depends on: 01*
 
-5. **Map expansion to 120×90** — 4× the area. Add all 8 named base locations (Military Outpost, Hangar, Tree Crescent, Cave System, Frozen Lake Cabin, Boulder Maze, Hilltop, Crash Site). Cave expands to ~5×4 interior with 1-2 entrances.
+5. **Military outpost zone** — `05-military-outpost.md` — Add the outpost area to the map. Multiple buildings, sandbag walls, watchtower, armory. Near the crash site in Outbreak Mode. Justifies weapon/ammo abundance. *Depends on: 01*
+
+6. **Map expansion to 120×90** — `06-map-expansion.md` — 4× the area. Add all 8 named base locations (Military Outpost, Hangar, Tree Crescent, Cave System, Frozen Lake Cabin, Boulder Maze, Hilltop, Crash Site). *Depends on: 05*
 
 ### Priority 2 — Gameplay depth (next 3-6 sessions after P1)
 
-6. **Profession abilities** — Active skills tied to class, unlocked at levels 3/5/7
-   - Lumberjack: Power Chop, Hardy, Stockpile
-   - Hunter: Track, Aimed Shot, Skin Master
-   - Mechanic: Salvage, Jury-Rig, Lucky Find
-   - Medic: Field Bandage, Diagnose, Stim Pack
-   - Prospector: Power Mine, Cold Forged, Earth Sense
-   - Veteran: Battle Cry, Iron Will, Execute
+7. **Outbreak events** — `10-outbreak-events.md` — Replace/supplement cold-themed events with horde-themed ones in Outbreak Mode (big horde tonight, fast zombies, screamer spotted, weapon cache, ammo cache). Keep weather events. *Depends on: 01, 03*
 
-7. **Outbreak events** — Replace/supplement cold-themed events with horde-themed ones in Outbreak Mode (big horde tonight, fast zombies, screamer spotted, weapon cache, ammo cache). Keep weather events.
+8. **Defensive structures** — `11-defensive-structures.md` — Barricades, reinforced walls, spike traps. Zombies attack structures. Structures have HP and can be repaired. Cost wood/stone. *Depends on: 02, 03*
 
-8. **Defensive structures** — Barricades, reinforced walls, spike traps. Zombies attack structures. Structures have HP and can be repaired. Cost wood/stone.
+9. **Profession abilities** — `12-profession-abilities.md` — Active skills tied to class, unlocked at levels 3/5/7. 18 abilities total across 6 professions. *No dependencies*
+
+10. **Interaction overhaul** — `13-interaction-overhaul.md` — 5 connected improvements: reduce predator lethality, corpse looting, ranged projectile animations, building interaction menus, build-time + adjacency requirements. Review against pivot before running. *No strict dependencies, but review for mode-awareness*
 
 ### Priority 3 — HUD + UX overhaul (after P2)
 
-9. **Mission A — D2-style bottom HUD** — Orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
+11. **Mission A — D2-style bottom HUD** — `07-mission-a-d2-hud.md` — Orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
 
-10. **Mission B — WC3 animated day/night dial** — Circular SVG dial with filling segments and sun/moon morph
+12. **Mission B — WC3 animated day/night dial** — `08-mission-b-clock-dial.md` — Circular SVG dial with filling segments and sun/moon morph. *Depends on: 07*
 
-11. **Mission C — Workbench crafting hub** — Click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.)
+13. **Mission C — Workbench crafting hub** — `09-mission-c-workbench-crafting.md` — Click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.). *Depends on: 07*
 
 ### Priority 4 — Polish + expansion (medium-term)
 
@@ -154,6 +152,7 @@ This is the critical path. Everything else waits until Outbreak Mode is playable
 | Quick Wins | May 2026 | Faster combat speeds, multi-hit harvest, level-up button repositioned |
 | Bug Fix | May 2026 | Animal attack throttle — animals were attacking every 100ms tick instead of respecting attackSpeed. Split map assignment to fix stale-reference bug (commit 829095e) |
 | Pivot Docs | May 2026 | PIVOT.md created, VISION.md and ROADMAP.md updated to reflect two-mode design (Wilderness + Outbreak) |
+| Seed Queue | May 2026 | 13 prompt seeds written and queued: 8 new (mode selection, shambler, wave spawner, vitals rebalance, military outpost, map expansion, outbreak events, defensive structures) + 5 renumbered (HUD, clock, workbench, profession abilities, interaction overhaul) |
 
 ---
 

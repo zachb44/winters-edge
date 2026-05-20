@@ -1,27 +1,51 @@
-# Queued Prompts
+# Prompt Queue
 
-Claude Code prompts ready to run. Each is a standalone bundle.
+Seed prompts for Claude Code sessions. Each file is a self-contained task prompt. Paste it into Claude Code pointed at the `zachb44/winters-edge` repo.
 
-When one ships, move the file to `../completed/` and add a note to ROADMAP.md.
+## How to use
 
-## Run order
+1. Pick the next numbered prompt
+2. Paste the full contents into a Claude Code session
+3. Claude Code reads the repo, proposes a plan, waits for your go-ahead, then implements
+4. After completion, move the prompt to `docs/prompts/completed/` and update `docs/ROADMAP.md`
 
-### 🔴 Critical (run first)
+## Current queue
 
-1. `00-bugfix-animal-attack-throttle.md` — Hostile animals attack on every tick instead of respecting attack speed. Game is unplayable when this triggers (wolves machine-gun, boars spawn-camp the player to death).
+### Phase 1 — Outbreak Mode core
+| # | File | Description | Dependencies |
+|---|---|---|---|
+| 01 | `01-mode-selection.md` | Mode selection in character creation | None — run first |
+| 02 | `02-shambler-zombie.md` | Zombie entity + AI + combat | 01 |
+| 03 | `03-wave-spawner.md` | Night waves + night counter + win condition | 01, 02 |
+| 04 | `04-vitals-rebalance.md` | Outbreak hunger/warmth to 1/4 rate | 01 |
+| 05 | `05-military-outpost.md` | Outpost zone on current map | 01 |
+| 06 | `06-map-expansion.md` | 120×90 map + all 8 named locations | 05 |
 
-### Then features
+### Phase 2 — Gameplay depth
+| # | File | Description | Dependencies |
+|---|---|---|---|
+| 10 | `10-outbreak-events.md` | Horde-themed daily events | 01, 03 |
+| 11 | `11-defensive-structures.md` | Barricades, walls, spike traps | 02, 03 |
+| 12 | `12-profession-abilities.md` | 18 abilities across 6 professions | None |
+| 13 | `13-interaction-overhaul.md` | 5 UX improvements (lethality, corpses, menus) | Review vs pivot |
 
-2. `01-profession-abilities.md` — active class abilities at level milestones (biggest gameplay depth add)
-3. `05-interaction-overhaul.md` — predator damage tuning, corpses, projectiles, building menus, build time
-4. `02-mission-a-d2-hud.md` — D2-style bottom HUD with orbs + selectable buildings
-5. `03-mission-b-clock-dial.md` — animated day/night dial (depends on Mission A)
-6. `04-mission-c-workbench-crafting.md` — workbench as crafting hub (depends on Mission A)
+### Phase 3 — HUD + UX overhaul
+| # | File | Description | Dependencies |
+|---|---|---|---|
+| 07 | `07-mission-a-d2-hud.md` | D2-style bottom HUD with orbs | None |
+| 08 | `08-mission-b-clock-dial.md` | WC3 day/night dial | 07 |
+| 09 | `09-mission-c-workbench-crafting.md` | Workbench crafting menu | 07 |
 
-The missions are sequenced because Mission A creates the selectable-building panel that B and C build on top of. The interaction overhaul (05) overlaps with Mission A on building menus — when running 05, decide whether to ship its building menus as a placeholder or wait for Mission A's full HUD treatment.
+## Running multiple seeds in one session
 
-## Known issues to address opportunistically
+Seeds within the same phase are designed to work together. You can often run 2-3 in a single Claude Code session:
+- **01 + 04** — mode selection + vitals rebalance (both small, no conflicts)
+- **02 + 03** — zombie entity + wave spawner (03 depends on 02, but can run sequentially)
+- **10 + 11** — outbreak events + defensive structures (independent of each other)
+- **07 + 08 + 09** — all three HUD missions (08 and 09 depend on 07)
 
-- Level Up notification at the top of the screen is hard to spot — will be naturally fixed by Mission A (D2 HUD will place this near the orbs).
-- Boar permanent aggro can feel punishing if you spawn near one — interaction overhaul (05) addresses this with damage reduction; could also add a 5-min aggro timeout if it still feels harsh.
-- No spawn protection for hostile animals near crash sites — consider adding to bug-fix prompt 00 if the throttle fix alone isn't enough.
+Don't cross phases in a single session. Finish Phase 1 before starting Phase 2.
+
+## Completed prompts
+
+See `docs/prompts/completed/` for prompts that have been executed.
