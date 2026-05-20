@@ -74,6 +74,8 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
     combatTarget: null,
     combatTargetType: null,
     zombies: [],
+    wave: { nightNumber: 0, totalToSpawn: 0, spawned: 0, subWaveIndex: 0, nextSubWaveTime: null, active: false },
+    isNightPhase: false,
     harvestTarget: null,
     tileHp: {},
     characterXp: 0,
@@ -286,6 +288,21 @@ export default function WintersEdge() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.day]);
+
+  // Sundown banner (Outbreak only). Fires when a new wave activates.
+  useEffect(() => {
+    if (!gameStarted || state.showIntro) return;
+    if (state.mode !== 'outbreak') return;
+    if (!state.wave?.active || !state.wave.nightNumber) return;
+    setDayBanner({
+      type: 'night',
+      nightNumber: state.wave.nightNumber,
+      waveSize: state.wave.totalToSpawn,
+    });
+    const t = setTimeout(() => setDayBanner(null), 3000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.wave?.nightNumber, state.wave?.active]);
 
   // Level-up banner (fires on any change to characterLevel, skipping the
   // initial 1 → 1 render at game start)
@@ -559,15 +576,9 @@ export default function WintersEdge() {
         }
       } else if (b.type === 'tent') {
         if (s.time > 19 || s.time < 6) {
-          s.time = 7;
-          s.day += 1;
           s.player.warmth = Math.min(s.player.maxWarmth ?? 100, s.player.warmth + 30);
-          s.player.stamina = s.player.maxStamina ?? 100;
-          s = addLog(s, '😴 You sleep through the night.');
-          if (s.day === 30 && s.scenario === 'rescue') {
-            s.rescued = true;
-            s = addLog(s, '🎉 RESCUE!');
-          }
+          s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + 20);
+          s = addLog(s, '😴 You rest at the tent. (+30 warmth, +20 HP)');
         } else s = addLog(s, 'Too early to sleep.');
       } else if (b.type === 'trap') {
         if (b.caught) {

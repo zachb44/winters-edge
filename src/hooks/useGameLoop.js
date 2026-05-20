@@ -17,7 +17,7 @@ import {
 import { HARVEST_SWING_MS, HARVEST_STAMINA_FLOOR, HARVEST_RANGE } from '../data/harvest.js';
 import { MODE_CONFIG } from '../data/modeConfig.js';
 import { ZOMBIE_TYPES, zombieTicksPerMove } from '../data/zombies.js';
-import { applyZombieAttack } from '../logic/zombies.js';
+import { applyZombieAttack, getWaveSize, spawnSubWave, despawnAllZombies } from '../logic/zombies.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -94,7 +94,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           } else if (event.id === 'lost_traveler') {
             s.pendingTraveler = { resolved: false };
           }
-          if (s.day === 30 && s.scenario === 'rescue') {
+          if (s.day === 30 && s.scenario === 'rescue' && s.mode !== 'outbreak') {
             s.rescued = true;
             s = addLog(s, '🎉 RESCUE HELICOPTER ARRIVES! You survived!');
             return s;
@@ -480,6 +480,59 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             }
             return { ...z, lastMoveTick: tick };
           });
+        }
+
+        // ===== Wave management (outbreak only) =====
+        // Night phase: 18:00 -> 06:00. Distinct from the existing 19:00 isNight
+        // boundary used for wolf/vision — they intentionally coexist.
+        if (s.mode === 'outbreak') {
+          const nightPhase = s.time >= 18 || s.time < 6;
+          const wasNightPhase = !!s.isNightPhase;
+
+          // Sundown transition: start a new wave.
+          if (nightPhase && !wasNightPhase) {
+            const nightNumber = s.day;
+            const totalToSpawn = getWaveSize(nightNumber);
+            s.wave = {
+              nightNumber,
+              totalToSpawn,
+              spawned: 0,
+              subWaveIndex: 0,
+              nextSubWaveTime: 18.0,
+              active: true,
+            };
+            s = addLog(s, `🧟 Night ${nightNumber} begins — ${totalToSpawn} shamblers approaching.`);
+          }
+
+          // Active wave: spawn sub-waves on schedule.
+          if (s.wave?.active && s.wave.subWaveIndex < 4 && s.wave.spawned < s.wave.totalToSpawn) {
+            if (s.time >= s.wave.nextSubWaveTime) {
+              const remaining = s.wave.totalToSpawn - s.wave.spawned;
+              const subwavesLeft = 4 - s.wave.subWaveIndex;
+              const count = Math.min(remaining, Math.ceil(remaining / subwavesLeft));
+              s = spawnSubWave(s, map, count);
+              s.wave = {
+                ...s.wave,
+                spawned: s.wave.spawned + count,
+                subWaveIndex: s.wave.subWaveIndex + 1,
+                nextSubWaveTime: s.wave.nextSubWaveTime + 0.5,
+              };
+            }
+          }
+
+          // Dawn transition: despawn + win check.
+          if (!nightPhase && wasNightPhase) {
+            const survivedNight = s.wave?.nightNumber || 0;
+            s = despawnAllZombies(s);
+            s = addLog(s, '☀️ Dawn breaks. The dead retreat... for now.');
+            s.wave = { ...(s.wave || {}), active: false };
+            if (survivedNight >= 30 && s.scenario === 'rescue') {
+              s.rescued = true;
+              s = addLog(s, '🎉 You held the line for 30 nights. Extraction is here.');
+            }
+          }
+
+          s.isNightPhase = nightPhase;
         }
 
         if (tickRef.current % 200 === 0) {

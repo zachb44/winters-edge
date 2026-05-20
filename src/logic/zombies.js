@@ -1,12 +1,52 @@
 import { ZOMBIE_TYPES } from '../data/zombies.js';
 import { PROFESSIONS } from '../data/professions.js';
 import { ITEM_INFO } from '../data/loot.js';
+import { TILE_DATA } from '../data/tiles.js';
+import { MAP_W, MAP_H } from '../constants.js';
 import { pushLog } from './log.js';
 import { applyXp, powerDamageMultiplier } from '../data/leveling.js';
 
 let _nextZombieId = 1;
 export function newZombieId() { return _nextZombieId++; }
 export function resetZombieIds(value = 1) { _nextZombieId = value; }
+
+export function getWaveSize(nightNumber) {
+  const base = 3;
+  const perNight = 1.4;
+  return Math.floor(base + (nightNumber - 1) * perNight);
+}
+
+export function getEdgeSpawnPositions(map, count) {
+  const edges = [];
+  for (let x = 0; x < MAP_W; x++) {
+    if (map[0]?.[x] !== undefined && TILE_DATA[map[0][x]].walkable) edges.push({ x, y: 0 });
+    if (map[MAP_H - 1]?.[x] !== undefined && TILE_DATA[map[MAP_H - 1][x]].walkable) edges.push({ x, y: MAP_H - 1 });
+  }
+  for (let y = 1; y < MAP_H - 1; y++) {
+    if (map[y]?.[0] !== undefined && TILE_DATA[map[y][0]].walkable) edges.push({ x: 0, y });
+    if (map[y]?.[MAP_W - 1] !== undefined && TILE_DATA[map[y][MAP_W - 1]].walkable) edges.push({ x: MAP_W - 1, y });
+  }
+  const positions = [];
+  for (let i = 0; i < count && edges.length > 0; i++) {
+    positions.push(edges[Math.floor(Math.random() * edges.length)]);
+  }
+  return positions;
+}
+
+export function spawnSubWave(state, map, count) {
+  const positions = getEdgeSpawnPositions(map, count);
+  const fresh = positions.map(p => spawnZombie('shambler', p.x, p.y, state.wave?.nightNumber ?? state.day));
+  return { ...state, zombies: [...state.zombies, ...fresh] };
+}
+
+export function despawnAllZombies(state) {
+  let next = { ...state, zombies: [] };
+  if (next.combatTargetType === 'zombie') {
+    next.combatTarget = null;
+    next.combatTargetType = null;
+  }
+  return next;
+}
 
 export function spawnZombie(type, x, y, day = 1) {
   const t = ZOMBIE_TYPES[type];

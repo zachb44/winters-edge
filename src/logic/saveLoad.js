@@ -40,6 +40,8 @@ export function loadGame() {
         combatTarget: state.combatTarget ?? null,
         combatTargetType: state.combatTargetType ?? null,
         zombies,
+        wave: state.wave ?? { nightNumber: 0, totalToSpawn: 0, spawned: 0, subWaveIndex: 0, nextSubWaveTime: null, active: false },
+        isNightPhase: state.isNightPhase ?? false,
         harvestTarget: state.harvestTarget ?? null,
         tileHp: state.tileHp ?? {},
         characterXp: state.characterXp ?? 0,

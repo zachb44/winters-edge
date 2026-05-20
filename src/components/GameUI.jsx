@@ -26,7 +26,14 @@ export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
           </div>
         </div>
         <LevelButton pending={state.unspentStatPoints || 0} onClick={onOpenStatModal} />
-        <div>Day <span className="text-white font-bold">{state.day}</span>{state.scenario === 'rescue' ? '/30' : ''}</div>
+        {state.mode === 'outbreak' && state.isNightPhase
+          ? (
+            <div className="text-red-300">Night <span className="text-red-200 font-bold">{state.wave?.nightNumber || state.day}</span>{state.scenario === 'rescue' ? ' / 30' : ''}</div>
+          )
+          : (
+            <div>Day <span className="text-white font-bold">{state.day}</span>{state.mode !== 'outbreak' && state.scenario === 'rescue' ? '/30' : ''}</div>
+          )
+        }
         <div>{timeStr} {isNight ? '🌙' : '☀️'}</div>
         <div>
           {state.weather === 'clear' && '☀️ Clear'}
