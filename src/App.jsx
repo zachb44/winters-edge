@@ -72,6 +72,8 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
     crashSiteName: '',
     deathCause: null,
     combatTarget: null,
+    combatTargetType: null,
+    zombies: [],
     harvestTarget: null,
     tileHp: {},
     characterXp: 0,
@@ -322,7 +324,9 @@ export default function WintersEdge() {
         const tx = moveTarget.x, ty = moveTarget.y;
         // If we're chasing a combat target, stop walking once we're in attack range.
         if (prev.combatTarget !== null) {
-          const tgt = prev.animals.find(a => a.id === prev.combatTarget);
+          const tgt = prev.combatTargetType === 'zombie'
+            ? prev.zombies.find(z => z.id === prev.combatTarget)
+            : prev.animals.find(a => a.id === prev.combatTarget);
           if (tgt) {
             const td = Math.abs(tgt.x - prev.player.x) + Math.abs(tgt.y - prev.player.y);
             const range = (prev.inventory.hunting_bow > 0 || prev.inventory.rifle > 0) ? 3 : 1;
@@ -439,15 +443,23 @@ export default function WintersEdge() {
   };
 
   const engage = (animal) => {
-    setState(prev => ({ ...prev, combatTarget: animal.id, harvestTarget: null }));
+    setState(prev => ({ ...prev, combatTarget: animal.id, combatTargetType: 'animal', harvestTarget: null }));
     const d = Math.abs(animal.x - state.player.x) + Math.abs(animal.y - state.player.y);
     const range = (state.inventory.hunting_bow > 0 || state.inventory.rifle > 0) ? 3 : 1;
     if (d > range) setMoveTarget({ x: animal.x, y: animal.y });
     else setMoveTarget(null);
   };
 
+  const engageZombie = (zombie) => {
+    setState(prev => ({ ...prev, combatTarget: zombie.id, combatTargetType: 'zombie', harvestTarget: null }));
+    const d = Math.abs(zombie.x - state.player.x) + Math.abs(zombie.y - state.player.y);
+    const range = (state.inventory.hunting_bow > 0 || state.inventory.rifle > 0) ? 3 : 1;
+    if (d > range) setMoveTarget({ x: zombie.x, y: zombie.y });
+    else setMoveTarget(null);
+  };
+
   const engageHarvest = (tx, ty, tile) => {
-    setState(prev => ({ ...prev, harvestTarget: { x: tx, y: ty, tile }, combatTarget: null }));
+    setState(prev => ({ ...prev, harvestTarget: { x: tx, y: ty, tile }, combatTarget: null, combatTargetType: null }));
     const d = Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y);
     if (d > 1) setMoveTarget({ x: tx, y: ty });
     else setMoveTarget(null);
@@ -630,7 +642,7 @@ export default function WintersEdge() {
         setSelectedBuild(null);
         setStatModalOpen(false);
         setState(s => (s.combatTarget !== null || s.harvestTarget !== null)
-          ? ({ ...s, combatTarget: null, harvestTarget: null })
+          ? ({ ...s, combatTarget: null, combatTargetType: null, harvestTarget: null })
           : s);
       }
     };
@@ -659,6 +671,9 @@ export default function WintersEdge() {
     const crate = state.crates.find(c => c.x === tx && c.y === ty && !c.looted);
     if (crate && d <= 1) { lootCrate(crate); return; }
 
+    const zombie = state.zombies?.find(z => z.x === tx && z.y === ty && z.hp > 0);
+    if (zombie) { engageZombie(zombie); return; }
+
     const animal = state.animals.find(a => a.x === tx && a.y === ty && a.hp > 0);
     if (animal) { engage(animal); return; }
 
@@ -670,7 +685,7 @@ export default function WintersEdge() {
 
     // Non-engageable click: disengage both combat and harvest
     if (state.combatTarget !== null || state.harvestTarget !== null) {
-      setState(prev => ({ ...prev, combatTarget: null, harvestTarget: null }));
+      setState(prev => ({ ...prev, combatTarget: null, combatTargetType: null, harvestTarget: null }));
     }
 
     const building = state.buildings.find(b => b.x === tx && b.y === ty);

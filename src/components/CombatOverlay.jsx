@@ -4,9 +4,11 @@ import { TILE, VIEW_W, VIEW_H } from '../constants.js';
 // HP bar above the targeted animal + crossed-swords icon between
 // player and target. Stateless: receives combatTarget, animals,
 // player position. No game logic here.
-export function CombatOverlay({ combatTarget, animals, player, view }) {
+export function CombatOverlay({ combatTarget, combatTargetType, animals, zombies = [], player, view }) {
   if (combatTarget == null) return null;
-  const target = animals.find(a => a.id === combatTarget && a.hp > 0);
+  const target = combatTargetType === 'zombie'
+    ? zombies.find(z => z.id === combatTarget && z.hp > 0)
+    : animals.find(a => a.id === combatTarget && a.hp > 0);
   if (!target) return null;
   const inView = target.x >= view.x && target.x < view.x + VIEW_W
               && target.y >= view.y && target.y < view.y + VIEW_H;

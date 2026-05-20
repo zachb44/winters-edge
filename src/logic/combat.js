@@ -59,7 +59,10 @@ export function applyAttack(prev, animalId) {
     return { ...a, hp: newHp };
   });
   s.animals = newAnimals.filter(a => a.hp > 0);
-  if (lethal && s.combatTarget === animalId) s.combatTarget = null;
+  if (lethal && s.combatTarget === animalId) {
+    s.combatTarget = null;
+    s.combatTargetType = null;
+  }
   s.player = { ...s.player, stamina: Math.max(0, s.player.stamina - 12) };
   return { state: s, hit: { dmg, lethal, x: target.x, y: target.y } };
 }

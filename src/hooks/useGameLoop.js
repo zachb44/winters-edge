@@ -16,6 +16,8 @@ import {
 } from '../data/combat.js';
 import { HARVEST_SWING_MS, HARVEST_STAMINA_FLOOR, HARVEST_RANGE } from '../data/harvest.js';
 import { MODE_CONFIG } from '../data/modeConfig.js';
+import { ZOMBIE_TYPES, zombieTicksPerMove } from '../data/zombies.js';
+import { applyZombieAttack } from '../logic/zombies.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -235,16 +237,22 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         // same lastAttackMs timer + lunge. Player can only engage one at
         // a time; the click router enforces mutual exclusion.
         if (s.combatTarget !== null) {
-          const target = s.animals.find(a => a.id === s.combatTarget);
+          const isZombieTarget = s.combatTargetType === 'zombie';
+          const target = isZombieTarget
+            ? s.zombies.find(z => z.id === s.combatTarget)
+            : s.animals.find(a => a.id === s.combatTarget);
           if (!target || target.hp <= 0) {
             s.combatTarget = null;
+            s.combatTargetType = null;
           } else {
             const td = Math.abs(target.x - s.player.x) + Math.abs(target.y - s.player.y);
             const range = computePlayerRange(s);
             if (td <= range
                 && s.player.stamina >= STAMINA_FLOOR_TO_SWING
                 && now - (s.player.lastAttackMs || 0) >= computePlayerAttackSpeed(s, PROFESSIONS)) {
-              const result = applyAttack(s, target.id);
+              const result = isZombieTarget
+                ? applyZombieAttack(s, target.id)
+                : applyAttack(s, target.id);
               s = result.state;
               if (result.hit) {
                 s.player = { ...s.player, lastAttackMs: now, lungeUntil: now + 200, stamina: Math.max(0, s.player.stamina) };
@@ -411,6 +419,66 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               return { ...a, x: nx, y: ny };
             }
             return a;
+          });
+        }
+
+        // ===== Zombie AI (outbreak only) =====
+        // Attacks each tick (throttled by attackSpeed). Movement throttled per-zombie
+        // by lastMoveTick + zombieTicksPerMove(moveSpeed). Zombies single-mindedly
+        // path toward the player, ignore wildlife, and may stack on the same tile.
+        if (s.mode === 'outbreak' && s.zombies.length > 0) {
+          const tick = tickRef.current;
+
+          // Attack pass.
+          let zombiesAfterAttacks = s.zombies.map(z => {
+            if (z.hp <= 0) return z;
+            const d = Math.abs(z.x - s.player.x) + Math.abs(z.y - s.player.y);
+            if (d > 1) return z;
+            const type = ZOMBIE_TYPES[z.type];
+            if (!type) return z;
+            if (now - (z.lastAttackMs || 0) < type.attackSpeed) return z;
+            const dmgTaken = prof.mods.dmgReduction ? Math.floor(type.damage * prof.mods.dmgReduction) : type.damage;
+            s.player.hp = Math.max(0, s.player.hp - dmgTaken);
+            s = addLog(s, `🧟 A ${type.name.toLowerCase()} claws at you! (-${dmgTaken} HP)`);
+            if (s.player.hp <= 0 && !s.deathCause) {
+              s.deathCause = `Devoured by a ${type.name.toLowerCase()}.`;
+            }
+            if (onAnimalSwing) onAnimalSwing({ dmg: dmgTaken, animalId: z.id, px: s.player.x, py: s.player.y });
+            return { ...z, lastAttackMs: now, lungeUntil: now + 200 };
+          });
+          s.zombies = zombiesAfterAttacks;
+
+          if (s.player.hp <= 0 && !s.dead) {
+            s.dead = true;
+            s = addLog(s, '💀 You have died.');
+            return s;
+          }
+
+          // Movement pass — each zombie moves on its own cadence.
+          s.zombies = s.zombies.map(z => {
+            if (z.hp <= 0) return z;
+            // Locked-in target zombie stays still (mirrors animal behavior on
+            // the player's combat target).
+            if (s.combatTargetType === 'zombie' && s.combatTarget === z.id) return z;
+            const cadence = zombieTicksPerMove(ZOMBIE_TYPES[z.type].moveSpeed);
+            if (tick - (z.lastMoveTick || 0) < cadence) return z;
+            const dx = s.player.x - z.x;
+            const dy = s.player.y - z.y;
+            if (dx === 0 && dy === 0) return z;
+            // Try primary axis first, then secondary if blocked.
+            const primaryX = Math.abs(dx) >= Math.abs(dy);
+            const tryMoves = primaryX
+              ? [[Math.sign(dx), 0], [0, Math.sign(dy)]]
+              : [[0, Math.sign(dy)], [Math.sign(dx), 0]];
+            for (const [mx, my] of tryMoves) {
+              if (mx === 0 && my === 0) continue;
+              const nx = z.x + mx, ny = z.y + my;
+              if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
+              if (!map[ny] || map[ny][nx] === undefined) continue;
+              if (!TILE_DATA[map[ny][nx]].walkable) continue;
+              return { ...z, x: nx, y: ny, lastMoveTick: tick };
+            }
+            return { ...z, lastMoveTick: tick };
           });
         }
 

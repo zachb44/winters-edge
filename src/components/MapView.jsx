@@ -18,7 +18,11 @@ export function MapView({
   damageNumbers,
 }) {
   const now = Date.now();
-  const target = state.combatTarget != null ? state.animals.find(a => a.id === state.combatTarget) : null;
+  const target = state.combatTarget != null
+    ? (state.combatTargetType === 'zombie'
+        ? state.zombies.find(z => z.id === state.combatTarget)
+        : state.animals.find(a => a.id === state.combatTarget))
+    : null;
   const lungeAimAt = target || state.harvestTarget || null;
   const playerLungeOff = (state.player.lungeUntil > now && lungeAimAt)
     ? { dx: Math.sign(lungeAimAt.x - state.player.x) * 4, dy: Math.sign(lungeAimAt.y - state.player.y) * 4 }
@@ -168,6 +172,36 @@ export function MapView({
           );
         })}
 
+        {(() => {
+          const counts = {};
+          for (const z of (state.zombies || [])) {
+            if (z.hp <= 0) continue;
+            if (z.x < view.x || z.x >= view.x + VIEW_W || z.y < view.y || z.y >= view.y + VIEW_H) continue;
+            const vis = visibilityAt(fog, state.player.x, state.player.y, z.x, z.y);
+            if (vis < 2) continue;
+            const key = `${z.x},${z.y}`;
+            if (!counts[key]) counts[key] = { x: z.x, y: z.y, n: 0, lead: z };
+            counts[key].n += 1;
+          }
+          return Object.values(counts).map(({ x, y, n, lead }) => {
+            const lunging = lead.lungeUntil > now;
+            const lx = lunging ? Math.sign(state.player.x - x) * 4 : 0;
+            const ly = lunging ? Math.sign(state.player.y - y) * 4 : 0;
+            return (
+              <div key={`z-${x}-${y}`} className="absolute flex items-center justify-center pointer-events-none"
+                style={{
+                  left: (x - view.x) * TILE + lx, top: (y - view.y) * TILE + ly, width: TILE, height: TILE, fontSize: 22,
+                  transition: 'left 0.1s, top 0.1s',
+                }}>
+                🧟
+                {n > 1 && (
+                  <span className="absolute -bottom-0.5 -right-0.5 text-[10px] bg-red-700/90 text-white px-1 rounded leading-tight">×{n}</span>
+                )}
+              </div>
+            );
+          });
+        })()}
+
         {state.animals.filter(a => a.hp > 0 && a.x >= view.x && a.x < view.x + VIEW_W && a.y >= view.y && a.y < view.y + VIEW_H).map((a, i) => {
           const vis = visibilityAt(fog, state.player.x, state.player.y, a.x, a.y);
           if (vis < 2) return null;
@@ -267,7 +301,7 @@ export function MapView({
           );
         })}
 
-        <CombatOverlay combatTarget={state.combatTarget} animals={state.animals} player={state.player} view={view} />
+        <CombatOverlay combatTarget={state.combatTarget} combatTargetType={state.combatTargetType} animals={state.animals} zombies={state.zombies || []} player={state.player} view={view} />
         <HarvestHpBars tileHp={state.tileHp} map={map} view={view} />
         <FloatingDamage items={damageNumbers} view={view} />
         <PredatorAlert predator={nearbyPredator} />

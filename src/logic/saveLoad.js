@@ -1,4 +1,5 @@
 import { PROFESSIONS } from '../data/professions.js';
+import { resetZombieIds } from './zombies.js';
 
 export const SAVE_KEY = 'wintersedge.save.v1';
 
@@ -24,12 +25,21 @@ export function loadGame() {
       return null;
     }
     // Backfill defaults for fields introduced after this save was written.
+    const zombies = Array.isArray(state.zombies) ? state.zombies : [];
+    if (zombies.length > 0) {
+      const maxId = zombies.reduce((m, z) => Math.max(m, z.id || 0), 0);
+      resetZombieIds(maxId + 1);
+    } else {
+      resetZombieIds(1);
+    }
     return {
       ...data,
       state: {
         ...state,
         mode: state.mode ?? 'wilderness',
         combatTarget: state.combatTarget ?? null,
+        combatTargetType: state.combatTargetType ?? null,
+        zombies,
         harvestTarget: state.harvestTarget ?? null,
         tileHp: state.tileHp ?? {},
         characterXp: state.characterXp ?? 0,
