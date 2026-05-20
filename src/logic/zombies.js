@@ -10,8 +10,8 @@ export function newZombieId() { return _nextZombieId++; }
 export function resetZombieIds(value = 1) { _nextZombieId = value; }
 
 export function getWaveSize(nightNumber) {
-  const base = 3;
-  const perNight = 1.4;
+  const base = 5;
+  const perNight = 1.8;
   return Math.floor(base + (nightNumber - 1) * perNight);
 }
 

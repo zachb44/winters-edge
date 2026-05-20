@@ -481,6 +481,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
               if (!map[ny] || map[ny][nx] === undefined) continue;
               if (!TILE_DATA[map[ny][nx]].walkable) continue;
+              // Don't step onto the player's tile — attack from adjacent.
+              if (nx === s.player.x && ny === s.player.y) continue;
               return { ...z, x: nx, y: ny, lastMoveTick: tick };
             }
             return { ...z, lastMoveTick: tick };

@@ -5,7 +5,7 @@ export const ZOMBIE_TYPES = {
     hp: 30,
     damage: 6,
     attackSpeed: 1800,
-    moveSpeed: 2.5,
+    moveSpeed: 3.5,
     xpReward: 15,
     aggroRange: 6,
     loot: [
