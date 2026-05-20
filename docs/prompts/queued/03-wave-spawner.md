@@ -128,7 +128,8 @@ At dawn (06:00):
 1. All remaining zombies despawn (remove from `state.zombies`)
 2. Log message: "☀️ Dawn breaks. The dead retreat... for now."
 3. Set `state.wave.active = false`
-4. Do NOT award XP or loot for despawned zombies — only kills count
+4. **Clear combat target if it references a despawning zombie.** If `state.combatTargetType === 'zombie'`, set `state.combatTarget = null` and `state.combatTargetType = null`. This prevents the auto-attack loop from trying to look up a deleted zombie entity. Find how animal death already clears combat state (when a targeted animal dies) and replicate that same cleanup pattern for zombie despawn.
+5. Do NOT award XP or loot for despawned zombies — only kills count
 
 This keeps nights as the tension phase and days as the safe/build phase. Players can't just kite zombies until morning for free XP.
 
@@ -187,7 +188,7 @@ In `useGameLoop.js`, add a new section (after animal AI, after zombie AI from se
 if (state.mode === 'outbreak') {
   // 1. Detect sundown transition → start new wave
   // 2. Check if it's time for next sub-wave → spawn zombies
-  // 3. Detect dawn transition → despawn all zombies
+  // 3. Detect dawn transition → despawn all zombies + clear combat target
   // 4. Check win condition
 }
 ```
@@ -217,6 +218,7 @@ isNightPhase: false
 - [ ] Wave size scales with night number (Night 1 = 3, Night 30 = ~43)
 - [ ] Spawns staggered into 3-4 sub-waves across first 2 hours of night
 - [ ] All zombies despawn at dawn (06:00) with log message
+- [ ] **Combat target cleared when zombies despawn (no dangling reference)**
 - [ ] Night counter increments correctly
 - [ ] Day banner shows "NIGHT N" at sundown with wave info
 - [ ] Top bar shows night count during night phase
@@ -238,7 +240,8 @@ Commit message: `feat: night wave spawner with escalating zombie counts and win 
 1. Read `useGameLoop.js` — find the day/night transition detection and the existing win condition check
 2. Read `DayBanner.jsx` — understand how banners trigger and dismiss
 3. Read the top bar rendering to find where day count displays
-4. Propose integration points for the wave tick
-5. Wait for go-ahead
-6. Implement: wave logic functions → game loop integration → dawn/sundown detection → banner updates → win condition → save/load
-7. Test Night 1 manually (temporarily set wave size to 2-3 for quick testing)
+4. **Read how animal death clears `combatTarget` — replicate that pattern for zombie despawn**
+5. Propose integration points for the wave tick
+6. Wait for go-ahead
+7. Implement: wave logic functions → game loop integration → dawn/sundown detection → banner updates → win condition → combat cleanup → save/load
+8. Test Night 1 manually (temporarily set wave size to 2-3 for quick testing)
