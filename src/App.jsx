@@ -178,24 +178,30 @@ export default function WintersEdge() {
 
   useEffect(() => {
     if (!gameStarted) return;
+    // Dynamic dims so old (smaller) saves clamp to their actual map size
+    // rather than the new constants.
+    const mw = map[0]?.length ?? MAP_W;
+    const mh = map.length || MAP_H;
     setView({
-      x: Math.max(0, Math.min(MAP_W - VIEW_W, state.player.x - Math.floor(VIEW_W / 2))),
-      y: Math.max(0, Math.min(MAP_H - VIEW_H, state.player.y - Math.floor(VIEW_H / 2))),
+      x: Math.max(0, Math.min(mw - VIEW_W, state.player.x - Math.floor(VIEW_W / 2))),
+      y: Math.max(0, Math.min(mh - VIEW_H, state.player.y - Math.floor(VIEW_H / 2))),
     });
     setFog(prev => {
       const nf = prev.map(r => [...r]);
+      const fh = nf.length;
+      const fw = nf[0]?.length ?? 0;
       for (let dy = -VISION_RADIUS; dy <= VISION_RADIUS; dy++) {
         for (let dx = -VISION_RADIUS; dx <= VISION_RADIUS; dx++) {
           if (dx*dx + dy*dy <= VISION_RADIUS * VISION_RADIUS) {
             const x = state.player.x + dx;
             const y = state.player.y + dy;
-            if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) nf[y][x] = true;
+            if (x >= 0 && x < fw && y >= 0 && y < fh) nf[y][x] = true;
           }
         }
       }
       return nf;
     });
-  }, [state.player.x, state.player.y, gameStarted]);
+  }, [state.player.x, state.player.y, gameStarted, map]);
 
   const addLog = useCallback(pushLog, []);
 

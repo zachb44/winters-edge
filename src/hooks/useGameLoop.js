@@ -36,6 +36,11 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         tickRef.current++;
         let s = { ...prev };
         const prof = PROFESSIONS[s.profession];
+        // Dynamic map dims — old saves can be 60×45 while constants are now
+        // 120×90. Falling back to constants protects against a transient
+        // empty map between mode switches.
+        const W = map[0]?.length ?? MAP_W;
+        const H = map.length || MAP_H;
 
         s.time = s.time + 0.2 * s.gameSpeed * TIME_SCALE;
         if (s.time >= 24) {
@@ -51,8 +56,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             for (let i = 0; i < 2; i++) {
               let wx, wy, tries = 0;
               do {
-                wx = Math.floor(Math.random() * MAP_W);
-                wy = Math.floor(Math.random() * MAP_H);
+                wx = Math.floor(Math.random() * W);
+                wy = Math.floor(Math.random() * H);
                 tries++;
               } while (tries < 30 && (!map[wy] || !TILE_DATA[map[wy][wx]].walkable || Math.abs(wx - s.player.x) + Math.abs(wy - s.player.y) < 8));
               if (tries < 30) s.animals = [...s.animals, { type: 'wolf', x: wx, y: wy, hp: 25, maxHp: 25, hostile: true, id: newAnimalId() }];
@@ -74,8 +79,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             s.nextCrateDay = s.day;
           } else if (event.id === 'thaw') s.eventEffects.thaw = true;
           else if (event.id === 'frozen_carcass') {
-            const cx = Math.max(1, Math.min(MAP_W - 2, s.player.x + (Math.random() < 0.5 ? -3 : 3) + Math.floor(Math.random() * 3)));
-            const cy = Math.max(1, Math.min(MAP_H - 2, s.player.y + (Math.random() < 0.5 ? -3 : 3) + Math.floor(Math.random() * 3)));
+            const cx = Math.max(1, Math.min(W - 2, s.player.x + (Math.random() < 0.5 ? -3 : 3) + Math.floor(Math.random() * 3)));
+            const cy = Math.max(1, Math.min(H - 2, s.player.y + (Math.random() < 0.5 ? -3 : 3) + Math.floor(Math.random() * 3)));
             s.pendingCarcass = { x: cx, y: cy };
           } else if (event.id === 'blizzard_warning') s.eventEffects.blizzardIncoming = true;
           else if (event.id === 'bear_roaming') {
@@ -83,8 +88,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               if (a.type === 'bear') {
                 let bx, by, tries = 0;
                 do {
-                  bx = Math.floor(Math.random() * MAP_W);
-                  by = Math.floor(Math.random() * MAP_H);
+                  bx = Math.floor(Math.random() * W);
+                  by = Math.floor(Math.random() * H);
                   tries++;
                 } while (tries < 20 && (!map[by] || !TILE_DATA[map[by][bx]].walkable));
                 if (tries < 20) return { ...a, x: bx, y: by, homeX: bx, homeY: by };
@@ -110,10 +115,10 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               let sx, sy, tries = 0, ok = false;
               while (tries < 30 && !ok) {
                 const edge = Math.floor(Math.random() * 4);
-                if (edge === 0) { sx = Math.floor(Math.random() * MAP_W); sy = Math.floor(Math.random() * 3); }
-                else if (edge === 1) { sx = Math.floor(Math.random() * MAP_W); sy = MAP_H - 1 - Math.floor(Math.random() * 3); }
-                else if (edge === 2) { sx = Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * MAP_H); }
-                else { sx = MAP_W - 1 - Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * MAP_H); }
+                if (edge === 0) { sx = Math.floor(Math.random() * W); sy = Math.floor(Math.random() * 3); }
+                else if (edge === 1) { sx = Math.floor(Math.random() * W); sy = H - 1 - Math.floor(Math.random() * 3); }
+                else if (edge === 2) { sx = Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * H); }
+                else { sx = W - 1 - Math.floor(Math.random() * 3); sy = Math.floor(Math.random() * H); }
                 const distToPlayer = Math.abs(sx - s.player.x) + Math.abs(sy - s.player.y);
                 if (map[sy] && TILE_DATA[map[sy][sx]].walkable && distToPlayer >= 10) ok = true;
                 tries++;
@@ -218,8 +223,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         if (s.day >= s.nextCrateDay && s.time > 8 && s.time < 10 && tickRef.current % 30 === 0) {
           let cx, cy, attempts = 0;
           do {
-            cx = Math.floor(Math.random() * MAP_W);
-            cy = Math.floor(Math.random() * MAP_H);
+            cx = Math.floor(Math.random() * W);
+            cy = Math.floor(Math.random() * H);
             attempts++;
           } while (attempts < 20 && (!map[cy] || !TILE_DATA[map[cy][cx]].walkable));
           if (attempts < 20) {
@@ -364,8 +369,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
                 else ny += Math.sign(dy);
               }
               if (wakeNow) {
-                nx = Math.max(0, Math.min(MAP_W - 1, nx));
-                ny = Math.max(0, Math.min(MAP_H - 1, ny));
+                nx = Math.max(0, Math.min(W - 1, nx));
+                ny = Math.max(0, Math.min(H - 1, ny));
                 if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
                   return { ...a, x: nx, y: ny, aggro: true };
                 }
@@ -396,8 +401,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               const dir = Math.floor(Math.random() * 5);
               if (dir === 0) nx += 1; else if (dir === 1) nx -= 1;
               else if (dir === 2) ny += 1; else if (dir === 3) ny -= 1;
-              nx = Math.max(0, Math.min(MAP_W - 1, nx));
-              ny = Math.max(0, Math.min(MAP_H - 1, ny));
+              nx = Math.max(0, Math.min(W - 1, nx));
+              ny = Math.max(0, Math.min(H - 1, ny));
               return { ...a, x: nx, y: ny };
             } else if (a.type === 'seal') {
               if (Math.random() < 0.1) {
@@ -413,8 +418,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               else if (dir === 2) ny += 1; else if (dir === 3) ny -= 1;
             }
 
-            nx = Math.max(0, Math.min(MAP_W - 1, nx));
-            ny = Math.max(0, Math.min(MAP_H - 1, ny));
+            nx = Math.max(0, Math.min(W - 1, nx));
+            ny = Math.max(0, Math.min(H - 1, ny));
             if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
               return { ...a, x: nx, y: ny };
             }
@@ -473,7 +478,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             for (const [mx, my] of tryMoves) {
               if (mx === 0 && my === 0) continue;
               const nx = z.x + mx, ny = z.y + my;
-              if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
+              if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
               if (!map[ny] || map[ny][nx] === undefined) continue;
               if (!TILE_DATA[map[ny][nx]].walkable) continue;
               return { ...z, x: nx, y: ny, lastMoveTick: tick };

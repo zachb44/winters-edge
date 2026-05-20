@@ -2,7 +2,6 @@ import { ZOMBIE_TYPES } from '../data/zombies.js';
 import { PROFESSIONS } from '../data/professions.js';
 import { ITEM_INFO } from '../data/loot.js';
 import { TILE_DATA } from '../data/tiles.js';
-import { MAP_W, MAP_H } from '../constants.js';
 import { pushLog } from './log.js';
 import { applyXp, powerDamageMultiplier } from '../data/leveling.js';
 
@@ -18,13 +17,15 @@ export function getWaveSize(nightNumber) {
 
 export function getEdgeSpawnPositions(map, count) {
   const edges = [];
-  for (let x = 0; x < MAP_W; x++) {
+  const H = map.length;
+  const W = map[0]?.length ?? 0;
+  for (let x = 0; x < W; x++) {
     if (map[0]?.[x] !== undefined && TILE_DATA[map[0][x]].walkable) edges.push({ x, y: 0 });
-    if (map[MAP_H - 1]?.[x] !== undefined && TILE_DATA[map[MAP_H - 1][x]].walkable) edges.push({ x, y: MAP_H - 1 });
+    if (map[H - 1]?.[x] !== undefined && TILE_DATA[map[H - 1][x]].walkable) edges.push({ x, y: H - 1 });
   }
-  for (let y = 1; y < MAP_H - 1; y++) {
+  for (let y = 1; y < H - 1; y++) {
     if (map[y]?.[0] !== undefined && TILE_DATA[map[y][0]].walkable) edges.push({ x: 0, y });
-    if (map[y]?.[MAP_W - 1] !== undefined && TILE_DATA[map[y][MAP_W - 1]].walkable) edges.push({ x: MAP_W - 1, y });
+    if (map[y]?.[W - 1] !== undefined && TILE_DATA[map[y][W - 1]].walkable) edges.push({ x: W - 1, y });
   }
   const positions = [];
   for (let i = 0; i < count && edges.length > 0; i++) {

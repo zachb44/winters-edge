@@ -1,7 +1,7 @@
 // Visual / map dimensions
 export const TILE = 32;
-export const MAP_W = 60;
-export const MAP_H = 45;
+export const MAP_W = 120;
+export const MAP_H = 90;
 export const VIEW_W = 20;
 export const VIEW_H = 15;
 export const VISION_RADIUS = 5;
