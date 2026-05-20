@@ -1,24 +1,26 @@
 import React from 'react';
 import { SCENARIOS } from '../data/scenarios.js';
+import { MODES } from '../data/modes.js';
 import { PROFESSIONS } from '../data/professions.js';
 import { ITEM_INFO } from '../data/loot.js';
 
 export function SetupScreen({
   setupStep, setSetupStep,
+  chosenMode, setChosenMode,
   chosenScenario, setChosenScenario,
   chosenProfession, setChosenProfession,
   charName, setCharName,
   savedGameMeta, onContinue, onDeleteSave,
   onStartGame,
 }) {
-  if (setupStep === 'scenario') {
+  if (setupStep === 'mode') {
     return (
       <div className="w-full min-h-screen bg-slate-900 text-slate-100 p-4 font-mono flex items-center justify-center">
-        <div className="max-w-2xl w-full">
+        <div className="max-w-3xl w-full">
           <div className="text-center mb-6">
             <div className="text-5xl mb-2">❄️</div>
             <h1 className="text-3xl font-bold text-sky-300">Winter's Edge</h1>
-            <p className="text-slate-400 mt-2">A survival game in a frozen wilderness</p>
+            <p className="text-slate-400 mt-2">Choose your survival</p>
           </div>
           {savedGameMeta && (
             <div className="mb-6">
@@ -35,36 +37,79 @@ export function SetupScreen({
               </button>
             </div>
           )}
-          <div className="space-y-3 mb-6">
-            <h2 className="text-lg font-bold text-slate-300">Step 1 of 2 — Choose Your Scenario</h2>
-            {Object.entries(SCENARIOS).map(([key, sc]) => (
-              <button key={key} onClick={() => setChosenScenario(key)}
-                className={`w-full text-left p-4 rounded-lg border-2 transition ${chosenScenario === key ? 'border-sky-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}>
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="text-2xl">{sc.icon}</span>
-                  <span className="text-lg font-bold">{sc.name}</span>
-                  <span className="text-xs text-slate-400 ml-auto">{sc.difficulty}</span>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-300">Step 1 of 3 — Choose Your Mode</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            {Object.entries(MODES).map(([key, m]) => (
+              <button key={key} onClick={() => setChosenMode(key)}
+                className={`text-left p-4 rounded-lg border-2 transition ${chosenMode === key ? 'border-sky-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-3xl">{m.icon}</span>
+                  <div>
+                    <div className="text-lg font-bold">{m.name}</div>
+                    <div className="text-xs text-sky-300 italic">{m.tagline}</div>
+                  </div>
                 </div>
-                <p className="text-sm text-slate-300">{sc.desc}</p>
+                <p className="text-sm text-slate-300 mb-2">{m.desc}</p>
+                <div className="text-xs text-slate-500 italic">{m.tone}</div>
               </button>
             ))}
           </div>
-          <button onClick={() => setSetupStep('character')} className="w-full bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-lg">
-            Next: Choose Your Survivor →
+          <button onClick={() => setSetupStep('scenario')} className="w-full bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-lg">
+            Next: Choose Your Scenario →
           </button>
         </div>
       </div>
     );
   }
 
+  if (setupStep === 'scenario') {
+    const modeMeta = MODES[chosenMode];
+    return (
+      <div className="w-full min-h-screen bg-slate-900 text-slate-100 p-4 font-mono flex items-center justify-center">
+        <div className="max-w-2xl w-full">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-2">{modeMeta.icon}</div>
+            <h1 className="text-3xl font-bold text-sky-300">Winter's Edge</h1>
+            <p className="text-slate-400 mt-2">{modeMeta.name}</p>
+          </div>
+          <div className="space-y-3 mb-6">
+            <h2 className="text-lg font-bold text-slate-300">Step 2 of 3 — Choose Your Scenario</h2>
+            {Object.entries(SCENARIOS).map(([key, sc]) => (
+              <button key={key} onClick={() => setChosenScenario(key)}
+                className={`w-full text-left p-4 rounded-lg border-2 transition ${chosenScenario === key ? 'border-sky-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}>
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-2xl">{sc.icon}</span>
+                  <span className="text-lg font-bold">{sc.name[chosenMode]}</span>
+                  <span className="text-xs text-slate-400 ml-auto">{sc.difficulty}</span>
+                </div>
+                <p className="text-sm text-slate-300">{sc.desc[chosenMode]}</p>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setSetupStep('mode')} className="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-lg">← Back</button>
+            <button onClick={() => setSetupStep('character')} className="flex-1 bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-lg">
+              Next: Choose Your Survivor →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const prof = PROFESSIONS[chosenProfession];
+  const crashFlavor = chosenMode === 'outbreak'
+    ? '🛬 Your plane will crash near a military outpost.'
+    : '🛬 Your plane will crash at a random location.';
   return (
     <div className="w-full min-h-screen bg-slate-900 text-slate-100 p-4 font-mono flex items-center justify-center">
       <div className="max-w-3xl w-full">
         <div className="text-center mb-4">
           <div className="text-3xl mb-1">{prof.playerEmoji}</div>
           <h1 className="text-2xl font-bold text-sky-300">Choose Your Survivor</h1>
-          <p className="text-slate-400 text-sm mt-1">Step 2 of 2 — Each profession plays differently</p>
+          <p className="text-slate-400 text-sm mt-1">Step 3 of 3 — Each profession plays differently</p>
         </div>
         <div className="mb-4">
           <label className="text-sm text-slate-300 mb-1 block">Name your survivor:</label>
@@ -100,12 +145,12 @@ export function SetupScreen({
             ))}
           </div>
           <div className="text-slate-500 mt-2 italic">
-            🛬 Your plane will crash at a random location.
+            {crashFlavor}
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSetupStep('scenario')} className="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-lg">← Back</button>
-          <button onClick={() => { setSetupStep('scenario'); onStartGame(chosenScenario, chosenProfession, charName); }}
+          <button onClick={() => { setSetupStep('mode'); onStartGame(chosenMode, chosenScenario, chosenProfession, charName); }}
             className="flex-1 bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-lg">
             Begin Survival
           </button>

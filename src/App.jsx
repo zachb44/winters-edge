@@ -27,7 +27,7 @@ import { LevelUpOverlay } from './components/LevelUpOverlay.jsx';
 import { StatUpgradeModal } from './components/StatUpgradeModal.jsx';
 import { useGameLoop } from './hooks/useGameLoop.js';
 
-const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
+const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 28, y: 22 }, profession = 'lumberjack', charName = 'Survivor') => {
   const prof = PROFESSIONS[profession];
   const baseInv = {
     wood: 0, stone: 0, scrap: 0, food: 3, raw_meat: 0, cooked_meat: 0, pelts: 0, fat: 0, medkit: 0,
@@ -59,6 +59,7 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
     weather: 'clear',
     log: [{ msg: `${charName} the ${prof.name} wakes in the wreckage. Cold. Alone.`, day: 1, time: 8 }],
     gameSpeed: 1, paused: true, dead: false, rescued: false,
+    mode,
     scenario,
     nextCrateDay: 4,
     nextRespawnDay: 5,
@@ -82,13 +83,14 @@ const initialState = (scenario = 'rescue', startPos = { x: 28, y: 22 }, professi
 
 export default function WintersEdge() {
   const [gameStarted, setGameStarted] = useState(false);
-  const [setupStep, setSetupStep] = useState('scenario');
+  const [setupStep, setSetupStep] = useState('mode');
+  const [chosenMode, setChosenMode] = useState('wilderness');
   const [chosenScenario, setChosenScenario] = useState('rescue');
   const [chosenProfession, setChosenProfession] = useState('lumberjack');
   const [charName, setCharName] = useState('');
   const [mapData, setMapData] = useState(() => genMap());
   const [map, setMap] = useState(mapData.map);
-  const [state, setState] = useState(() => initialState('rescue', { x: mapData.startX, y: mapData.startY }, 'lumberjack', 'Survivor'));
+  const [state, setState] = useState(() => initialState('wilderness', 'rescue', { x: mapData.startX, y: mapData.startY }, 'lumberjack', 'Survivor'));
   const [fog, setFog] = useState(() => Array(MAP_H).fill(null).map(() => Array(MAP_W).fill(false)));
   const [view, setView] = useState({ x: 18, y: 14 });
   const [menu, setMenu] = useState(null);
@@ -133,12 +135,12 @@ export default function WintersEdge() {
   const flashIdRef = useRef(0);
   const lastHpRef = useRef(100);
 
-  const startGame = (scenario, profession, name) => {
+  const startGame = (mode, scenario, profession, name) => {
     const md = genMap();
     setMapData(md);
     setMap(md.map);
     const finalName = name && name.trim() ? name.trim() : 'Survivor';
-    const fresh = initialState(scenario, { x: md.startX, y: md.startY }, profession, finalName);
+    const fresh = initialState(mode, scenario, { x: md.startX, y: md.startY }, profession, finalName);
     fresh.animals = spawnInitialAnimals();
     fresh.crashSiteName = md.siteName;
     fresh.showIntro = true;
@@ -166,7 +168,7 @@ export default function WintersEdge() {
     saveGame(state, map, fog);
     refreshSavedMeta(state);
     setGameStarted(false);
-    setSetupStep('scenario');
+    setSetupStep('mode');
   };
 
   useEffect(() => {
@@ -687,6 +689,7 @@ export default function WintersEdge() {
     return (
       <SetupScreen
         setupStep={setupStep} setSetupStep={setSetupStep}
+        chosenMode={chosenMode} setChosenMode={setChosenMode}
         chosenScenario={chosenScenario} setChosenScenario={setChosenScenario}
         chosenProfession={chosenProfession} setChosenProfession={setChosenProfession}
         charName={charName} setCharName={setCharName}
@@ -753,7 +756,7 @@ export default function WintersEdge() {
                   <InventoryMenu equipment={state.equipment} inventory={state.inventory} onEat={eat} />
                 )}
                 {menu === 'skills' && <SkillsMenu skills={state.skills} />}
-                {menu === 'help' && <HelpMenu scenario={state.scenario} />}
+                {menu === 'help' && <HelpMenu scenario={state.scenario} mode={state.mode} />}
               </div>
             </div>
           </div>
@@ -779,7 +782,7 @@ export default function WintersEdge() {
           profession={state.profession}
           day={state.day}
           deathCause={state.deathCause}
-          onNewGame={() => { clearSave(); setSavedGameMeta(null); setGameStarted(false); setSetupStep('scenario'); }}
+          onNewGame={() => { clearSave(); setSavedGameMeta(null); setGameStarted(false); setSetupStep('mode'); }}
         />
       </div>
     </div>

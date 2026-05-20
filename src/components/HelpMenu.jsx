@@ -1,10 +1,10 @@
 import React from 'react';
 import { SCENARIOS } from '../data/scenarios.js';
 
-export function HelpMenu({ scenario }) {
+export function HelpMenu({ scenario, mode = 'wilderness' }) {
   return (
     <div className="space-y-1">
-      <div><b>Goal:</b> {SCENARIOS[scenario].desc}</div>
+      <div><b>Goal:</b> {SCENARIOS[scenario].desc[mode]}</div>
       <div className="border-t border-slate-700 pt-1 mt-1">
         <div><b>Click</b> tiles to move/interact.</div>
         <div><b>Trees</b>→wood. <b>Rocks</b>→stone. <b>Plane/Cabin</b>→loot.</div>

@@ -28,6 +28,7 @@ export function loadGame() {
       ...data,
       state: {
         ...state,
+        mode: state.mode ?? 'wilderness',
         combatTarget: state.combatTarget ?? null,
         harvestTarget: state.harvestTarget ?? null,
         tileHp: state.tileHp ?? {},
