@@ -4,6 +4,7 @@ import { T, TILE_DATA } from '../data/tiles.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { PROFESSIONS } from '../data/professions.js';
 import { LOOT_BUDGET } from '../data/loot.js';
+import { SPAWN_ZONES } from '../data/spawnZones.js';
 import { visibilityAt } from '../logic/visibility.js';
 import { PredatorAlert } from './PredatorAlert.jsx';
 import { FloatingDamage } from './FloatingDamage.jsx';
@@ -172,6 +173,30 @@ export function MapView({
           );
         })}
 
+        {(state.spawnZones || []).map((z, i) => {
+          if (z.x < view.x || z.x >= view.x + VIEW_W || z.y < view.y || z.y >= view.y + VIEW_H) return null;
+          const vis = visibilityAt(fog, state.player.x, state.player.y, z.x, z.y);
+          if (vis === 0) return null;
+          const def = SPAWN_ZONES.find(s => s.id === z.id);
+          if (!def) return null;
+          const isActive = state.mode === 'outbreak'
+            && state.isNightPhase
+            && (state.wave?.activeZoneIds || []).includes(z.id);
+          return (
+            <div key={`zone-${z.id}-${i}`} className="absolute flex items-center justify-center pointer-events-none"
+              style={{
+                left: (z.x - view.x) * TILE,
+                top: (z.y - view.y) * TILE,
+                width: TILE, height: TILE,
+                fontSize: 22,
+                filter: vis === 1 ? 'brightness(0.5)' : 'none',
+                animation: isActive ? 'flicker 1s ease-in-out infinite alternate' : 'none',
+              }}>
+              {def.emoji}
+            </div>
+          );
+        })}
+
         {(() => {
           const counts = {};
           for (const z of (state.zombies || [])) {
@@ -324,6 +349,18 @@ export function MapView({
           else if (tile === T.MILITARY_FLOOR) text = '🟫 Concrete Floor';
           else if (tile === T.CAVE) text = '🕳️ Cave — Walkable shelter';
           else if (tile === T.TOWER) text = '📡 Radio Tower — Reach with 10 food, 5 wood, coat to win';
+          else if (tile === T.SPAWN_ZONE) {
+            // Look up which zone this tile belongs to (within ±1 of center).
+            const zone = SPAWN_ZONES.find(z =>
+              Math.abs(z.x - hover.x) <= 1 && Math.abs(z.y - hover.y) <= 1
+            );
+            if (zone) {
+              const warn = (state.mode === 'outbreak' && state.isNightPhase)
+                ? ' ⚠️ Zombies are emerging here'
+                : '';
+              text = `${zone.emoji} ${zone.name} — ${zone.desc}${warn}`;
+            }
+          }
           if (!text) return null;
           const left = (hover.x - view.x) * TILE + TILE + 4;
           const top = (hover.y - view.y) * TILE - 4;
@@ -335,7 +372,7 @@ export function MapView({
               top,
               maxWidth: 220,
             }}>
-              <div className="bg-slate-900/95 border border-slate-600 rounded px-2 py-1 text-xs text-slate-100 shadow-lg whitespace-nowrap">
+              <div className="bg-slate-900/95 border border-slate-600 rounded px-2 py-1 text-xs text-slate-100 shadow-lg">
                 {text}
               </div>
             </div>

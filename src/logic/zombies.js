@@ -2,6 +2,7 @@ import { ZOMBIE_TYPES } from '../data/zombies.js';
 import { PROFESSIONS } from '../data/professions.js';
 import { ITEM_INFO } from '../data/loot.js';
 import { TILE_DATA } from '../data/tiles.js';
+import { SPAWN_ZONES } from '../data/spawnZones.js';
 import { pushLog } from './log.js';
 import { applyXp, powerDamageMultiplier } from '../data/leveling.js';
 
@@ -34,8 +35,46 @@ export function getEdgeSpawnPositions(map, count) {
   return positions;
 }
 
+// Zone-based spawn picker. Uses the wave's locked activeZoneIds when present
+// (set at sundown so threat direction stays stable across sub-waves) and
+// otherwise re-derives by player distance.
+export function getZoneSpawnPositions(state, map, count) {
+  const activeIds = state.wave?.activeZoneIds;
+  let activeZones;
+  if (activeIds && activeIds.length > 0) {
+    activeZones = SPAWN_ZONES.filter(z => activeIds.includes(z.id));
+  } else {
+    const player = state.player;
+    const zonesByDist = SPAWN_ZONES
+      .map(z => ({ ...z, dist: Math.abs(z.x - player.x) + Math.abs(z.y - player.y) }))
+      .sort((a, b) => a.dist - b.dist);
+    const activeCount = (state.wave?.nightNumber ?? 0) >= 11 ? 3 : 2;
+    activeZones = zonesByDist.slice(0, activeCount);
+  }
+  if (activeZones.length === 0) return [];
+
+  const W = map[0]?.length ?? 0;
+  const H = map.length;
+  const positions = [];
+  const perZone = Math.ceil(count / activeZones.length);
+  for (const zone of activeZones) {
+    const needed = Math.min(perZone, count - positions.length);
+    for (let i = 0; i < needed; i++) {
+      const ox = zone.x + Math.floor(Math.random() * 7) - 3;
+      const oy = zone.y + Math.floor(Math.random() * 7) - 3;
+      const cx = Math.max(0, Math.min(W - 1, ox));
+      const cy = Math.max(0, Math.min(H - 1, oy));
+      positions.push({ x: cx, y: cy });
+    }
+  }
+  return positions;
+}
+
 export function spawnSubWave(state, map, count) {
-  const positions = getEdgeSpawnPositions(map, count);
+  // Fall back to edge spawning for old saves that predate spawn zones.
+  const positions = (state.spawnZones && state.spawnZones.length > 0)
+    ? getZoneSpawnPositions(state, map, count)
+    : getEdgeSpawnPositions(map, count);
   const fresh = positions.map(p => spawnZombie('shambler', p.x, p.y, state.wave?.nightNumber ?? state.day));
   return { ...state, zombies: [...state.zombies, ...fresh] };
 }

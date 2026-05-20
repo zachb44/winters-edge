@@ -12,6 +12,7 @@ import { gainXp } from './logic/progression.js';
 import { pushLog } from './logic/log.js';
 import { applyXp, XP_REWARDS, STAT_UPGRADES, levelProgress } from './data/leveling.js';
 import { saveGame, loadGame, clearSave } from './logic/saveLoad.js';
+import { SPAWN_ZONES } from './data/spawnZones.js';
 import { SetupScreen } from './components/SetupScreen.jsx';
 import { IntroOverlay } from './components/IntroOverlay.jsx';
 import { GameUI } from './components/GameUI.jsx';
@@ -74,7 +75,8 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
     combatTarget: null,
     combatTargetType: null,
     zombies: [],
-    wave: { nightNumber: 0, totalToSpawn: 0, spawned: 0, subWaveIndex: 0, nextSubWaveTime: null, active: false },
+    spawnZones: SPAWN_ZONES.map(z => ({ id: z.id, x: z.x, y: z.y })),
+    wave: { nightNumber: 0, totalToSpawn: 0, spawned: 0, subWaveIndex: 0, nextSubWaveTime: null, active: false, activeZoneIds: [], activeZoneNames: [] },
     isNightPhase: false,
     harvestTarget: null,
     tileHp: {},
@@ -305,6 +307,7 @@ export default function WintersEdge() {
       type: 'night',
       nightNumber: state.wave.nightNumber,
       waveSize: state.wave.totalToSpawn,
+      activeZoneNames: state.wave.activeZoneNames || [],
     });
     const t = setTimeout(() => setDayBanner(null), 3000);
     return () => clearTimeout(t);

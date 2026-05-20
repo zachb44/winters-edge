@@ -40,7 +40,17 @@ export function loadGame() {
         combatTarget: state.combatTarget ?? null,
         combatTargetType: state.combatTargetType ?? null,
         zombies,
-        wave: state.wave ?? { nightNumber: 0, totalToSpawn: 0, spawned: 0, subWaveIndex: 0, nextSubWaveTime: null, active: false },
+        // Old saves without spawnZones fall through to edge spawning via
+        // spawnSubWave's length check. Don't backfill from SPAWN_ZONES here
+        // — those zones aren't stamped on the old map and would look weird.
+        spawnZones: Array.isArray(state.spawnZones) ? state.spawnZones : [],
+        wave: {
+          nightNumber: 0, totalToSpawn: 0, spawned: 0, subWaveIndex: 0, nextSubWaveTime: null, active: false,
+          activeZoneIds: [], activeZoneNames: [],
+          ...(state.wave || {}),
+          activeZoneIds: state.wave?.activeZoneIds ?? [],
+          activeZoneNames: state.wave?.activeZoneNames ?? [],
+        },
         isNightPhase: state.isNightPhase ?? false,
         harvestTarget: state.harvestTarget ?? null,
         tileHp: state.tileHp ?? {},

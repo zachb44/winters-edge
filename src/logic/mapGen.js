@@ -1,4 +1,5 @@
 import { T, CRASH_SITES, OUTPOST_CRASH_SITE } from '../data/tiles.js';
+import { SPAWN_ZONES } from '../data/spawnZones.js';
 import { MAP_W, MAP_H } from '../constants.js';
 
 // 3x2 cabin shell: lootable cabin tile at (cx, cy) with cabin floor tiles
@@ -112,6 +113,24 @@ function placeCaveSystem(map) {
   }
 }
 
+// Stamps each spawn zone as a 3×3 cluster of SPAWN_ZONE tiles. Zones are
+// permanent map features visible in both modes; only Outbreak activates
+// them for zombie spawning. Called after named structures so scatter never
+// overwrites zone centers.
+function placeSpawnZones(map) {
+  for (const zone of SPAWN_ZONES) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = zone.x + dx;
+        const ny = zone.y + dy;
+        if (ny >= 0 && ny < map.length && nx >= 0 && nx < map[0].length) {
+          map[ny][nx] = T.SPAWN_ZONE;
+        }
+      }
+    }
+  }
+}
+
 // Hilltop zone: open elevated terrain at (50, 10) with a distinct lighter
 // tile color. Cabin at the center. A few scattered rocks for character.
 function placeHilltop(map) {
@@ -185,6 +204,10 @@ export function genMap(crashSite = null, mode = 'wilderness') {
   // tree/rock scatter passes.
   const outpostCrates = placeOutpost(map);
   const hangarCrates = placeHangar(map);
+
+  // Spawn zones — last so the 3×3 disturbed-ground clusters survive scatter
+  // and don't get overwritten by any structure pass.
+  placeSpawnZones(map);
 
   const site = crashSite
     || (mode === 'outbreak' ? OUTPOST_CRASH_SITE : CRASH_SITES[Math.floor(Math.random() * CRASH_SITES.length)]);

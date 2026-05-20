@@ -4,6 +4,7 @@ export const T = {
   MILITARY_FLOOR: 11, SANDBAG: 12, WATCHTOWER: 13, ARMORY: 14, BARRACKS: 15,
   WRECKAGE_METAL: 16, SCORCHED_GROUND: 17, CABIN_FLOOR: 18,
   HILLTOP: 19,
+  SPAWN_ZONE: 20,
 };
 
 export const CRASH_SITES = [
@@ -41,4 +42,5 @@ export const TILE_DATA = {
   [T.SCORCHED_GROUND]: { color: '#3a2820', walkable: true, name: 'Scorched Ground' },
   [T.CABIN_FLOOR]: { color: '#6b4a32', walkable: true, name: 'Cabin Floor' },
   [T.HILLTOP]: { color: '#f4f8fc', walkable: true, name: 'Hilltop' },
+  [T.SPAWN_ZONE]: { color: '#3a2a2a', walkable: true, name: 'Disturbed Ground' },
 };

@@ -18,6 +18,7 @@ import { HARVEST_SWING_MS, HARVEST_STAMINA_FLOOR, HARVEST_RANGE } from '../data/
 import { MODE_CONFIG } from '../data/modeConfig.js';
 import { ZOMBIE_TYPES, zombieTicksPerMove } from '../data/zombies.js';
 import { applyZombieAttack, getWaveSize, spawnSubWave, despawnAllZombies } from '../logic/zombies.js';
+import { SPAWN_ZONES } from '../data/spawnZones.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -500,6 +501,20 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           if (nightPhase && !wasNightPhase) {
             const nightNumber = s.day;
             const totalToSpawn = getWaveSize(nightNumber);
+            // Lock in the nearest 2 (nights 1-10) or 3 (nights 11+) spawn
+            // zones at sundown so threat direction stays stable across
+            // sub-waves even if the player moves at night.
+            let activeZoneIds = [];
+            let activeZoneNames = [];
+            if (s.spawnZones && s.spawnZones.length > 0) {
+              const k = nightNumber >= 11 ? 3 : 2;
+              const nearest = SPAWN_ZONES
+                .map(z => ({ z, dist: Math.abs(z.x - s.player.x) + Math.abs(z.y - s.player.y) }))
+                .sort((a, b) => a.dist - b.dist)
+                .slice(0, k);
+              activeZoneIds = nearest.map(n => n.z.id);
+              activeZoneNames = nearest.map(n => n.z.name);
+            }
             s.wave = {
               nightNumber,
               totalToSpawn,
@@ -507,8 +522,13 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               subWaveIndex: 0,
               nextSubWaveTime: 18.0,
               active: true,
+              activeZoneIds,
+              activeZoneNames,
             };
-            s = addLog(s, `🧟 Night ${nightNumber} begins — ${totalToSpawn} shamblers approaching.`);
+            const fromMsg = activeZoneNames.length > 0
+              ? ` from the ${activeZoneNames.join(' and ')}`
+              : '';
+            s = addLog(s, `🧟 Night ${nightNumber} begins — ${totalToSpawn} shamblers approaching${fromMsg}.`);
           }
 
           // Active wave: spawn sub-waves on schedule.
