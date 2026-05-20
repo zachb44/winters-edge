@@ -1,6 +1,7 @@
 export const T = {
   SNOW: 0, TREE: 1, ROCK: 2, ICE: 3, WATER: 4,
   PLANE: 5, CABIN: 6, CAVE: 7, SAPLING: 8, TOWER: 9, CRATE: 10,
+  MILITARY_FLOOR: 11, SANDBAG: 12, WATCHTOWER: 13, ARMORY: 14, BARRACKS: 15,
 };
 
 export const CRASH_SITES = [
@@ -10,6 +11,11 @@ export const CRASH_SITES = [
   { x: 22, y: 35, name: 'South Tundra' },
   { x: 32, y: 12, name: 'Northern Reach' },
 ];
+
+// Held separately from CRASH_SITES so the wilderness random roll can't
+// accidentally pick the outpost spawn. genMap forces this site only when
+// mode === 'outbreak'.
+export const OUTPOST_CRASH_SITE = { x: 44, y: 6, name: 'Near the Outpost' };
 
 export const TILE_DATA = {
   [T.SNOW]: { color: '#e8eef5', walkable: true, name: 'Snow' },
@@ -23,4 +29,9 @@ export const TILE_DATA = {
   [T.SAPLING]: { color: '#5a7a5a', walkable: false, name: 'Sapling', emoji: '🌱' },
   [T.TOWER]: { color: '#3a3a4a', walkable: true, name: 'Radio Tower', emoji: '📡' },
   [T.CRATE]: { color: '#a87830', walkable: false, name: 'Supply Crate', emoji: '📦' },
+  [T.MILITARY_FLOOR]: { color: '#4a4a4a', walkable: true, name: 'Concrete Floor' },
+  [T.SANDBAG]: { color: '#8b7d5e', walkable: false, name: 'Sandbag Wall', emoji: '🟤' },
+  [T.WATCHTOWER]: { color: '#3a3a3a', walkable: false, name: 'Watchtower', emoji: '🏗️' },
+  [T.ARMORY]: { color: '#4a3a2a', walkable: false, name: 'Armory', emoji: '🏚️' },
+  [T.BARRACKS]: { color: '#5a4a3a', walkable: false, name: 'Barracks', emoji: '🏚️' },
 };

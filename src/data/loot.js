@@ -1,6 +1,6 @@
 import { T } from './tiles.js';
 
-export const LOOT_BUDGET = { [T.PLANE]: 3, [T.CABIN]: 4 };
+export const LOOT_BUDGET = { [T.PLANE]: 3, [T.CABIN]: 4, [T.ARMORY]: 4, [T.BARRACKS]: 3 };
 
 export const LOOT_TABLES = {
   plane: {
@@ -27,6 +27,18 @@ export const LOOT_TABLES = {
     rare: [['rare_pelt',1,1,100]],
     weights: { common: 100, uncommon: 100, rare: 30 },
     multi: true,
+  },
+  armory: {
+    common: [['scrap',3,5,40],['cloth',1,2,30],['nothing',0,0,30]],
+    uncommon: [['hatchet',1,1,35],['hunting_bow',1,1,30],['scrap',2,4,20],['cloth',1,2,15]],
+    rare: [['rifle',1,1,40],['rifle_part',1,1,35],['hunting_bow',1,1,25]],
+    weights: { common: 45, uncommon: 40, rare: 15 },
+  },
+  barracks: {
+    common: [['food',2,3,30],['cloth',2,3,25],['scrap',1,2,25],['nothing',0,0,20]],
+    uncommon: [['medkit',1,1,35],['cooked_meat',1,2,25],['dried_meat',1,2,20],['cloth',2,3,20]],
+    rare: [['medkit',1,2,40],['fur_coat',1,1,30],['lantern',1,1,30]],
+    weights: { common: 50, uncommon: 38, rare: 12 },
   },
 };
 

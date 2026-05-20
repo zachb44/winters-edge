@@ -75,7 +75,7 @@ export function MapView({
             if (tile === undefined) return null;
             const data = TILE_DATA[tile];
             const vis = visibilityAt(fog, state.player.x, state.player.y, tx, ty);
-            const depleted = (tile === T.PLANE || tile === T.CABIN)
+            const depleted = (tile === T.PLANE || tile === T.CABIN || tile === T.ARMORY || tile === T.BARRACKS)
               && state.lootCounts && state.lootCounts[`${tx},${ty}`] === 0;
             let filter = 'none';
             if (vis === 1) filter = 'brightness(0.45) saturate(0.5)';
@@ -317,6 +317,11 @@ export function MapView({
           else if (tile === T.ROCK) text = '🪨 Rock — Click to mine for stone';
           else if (tile === T.PLANE) text = remaining > 0 ? `✈️ Plane Wreckage — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
           else if (tile === T.CABIN) text = remaining > 0 ? `🏚️ Abandoned Cabin — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
+          else if (tile === T.ARMORY) text = remaining > 0 ? `🪖 Armory — Click to search (${remaining} uses left)` : 'Armory — Searched';
+          else if (tile === T.BARRACKS) text = remaining > 0 ? `🛏️ Barracks — Click to search (${remaining} uses left)` : 'Barracks — Searched';
+          else if (tile === T.WATCHTOWER) text = '🏗️ Watchtower';
+          else if (tile === T.SANDBAG) text = '🟤 Sandbag Wall';
+          else if (tile === T.MILITARY_FLOOR) text = '🟫 Concrete Floor';
           else if (tile === T.CAVE) text = '🕳️ Cave — Walkable shelter';
           else if (tile === T.TOWER) text = '📡 Radio Tower — Reach with 10 food, 5 wood, coat to win';
           if (!text) return null;

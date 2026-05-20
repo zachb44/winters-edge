@@ -140,12 +140,13 @@ export default function WintersEdge() {
   const lastHpRef = useRef(100);
 
   const startGame = (mode, scenario, profession, name) => {
-    const md = genMap();
+    const md = genMap(null, mode);
     setMapData(md);
     setMap(md.map);
     const finalName = name && name.trim() ? name.trim() : 'Survivor';
     const fresh = initialState(mode, scenario, { x: md.startX, y: md.startY }, profession, finalName);
     fresh.animals = spawnInitialAnimals();
+    fresh.crates = md.outpostCrates || [];
     fresh.crashSiteName = md.siteName;
     fresh.showIntro = true;
     fresh.log = [
@@ -398,7 +399,7 @@ export default function WintersEdge() {
       let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
       const prof = PROFESSIONS[s.profession];
 
-      if (tile === T.PLANE || tile === T.CABIN) {
+      if (tile === T.PLANE || tile === T.CABIN || tile === T.ARMORY || tile === T.BARRACKS) {
         const key = `${tx},${ty}`;
         const lootCounts = { ...(s.lootCounts || {}) };
         const max = LOOT_BUDGET[tile];
@@ -407,8 +408,14 @@ export default function WintersEdge() {
           s = addLog(s, 'Picked clean — nothing left here.');
           return s;
         }
-        const tableName = tile === T.PLANE ? 'plane' : 'cabin';
-        const label = tile === T.PLANE ? 'Found' : 'Cabin';
+        const lootMeta = {
+          [T.PLANE]:    { table: 'plane',    label: 'Found' },
+          [T.CABIN]:    { table: 'cabin',    label: 'Cabin' },
+          [T.ARMORY]:   { table: 'armory',   label: 'Armory' },
+          [T.BARRACKS]: { table: 'barracks', label: 'Barracks' },
+        }[tile];
+        const tableName = lootMeta.table;
+        const label = lootMeta.label;
         let drops = rollFromTable(tableName);
         if (prof.mods.lootReroll) {
           const d2 = rollFromTable(tableName);
@@ -702,7 +709,7 @@ export default function WintersEdge() {
     const building = state.buildings.find(b => b.x === tx && b.y === ty);
     if (building && d <= 1) { interactBuilding(building); return; }
 
-    if (tile === T.PLANE || tile === T.CABIN) {
+    if (tile === T.PLANE || tile === T.CABIN || tile === T.ARMORY || tile === T.BARRACKS) {
       interact(tx, ty);
       return;
     }
