@@ -109,14 +109,25 @@ The player can click a zombie to target it, same as clicking an animal:
    - Award XP: `ZOMBIE_TYPES[zombie.type].xpReward`
    - Log message: "🧟 Shambler destroyed! +15 XP"
 
-**Combat target tracking:** The existing `state.combatTarget` system tracks by animal ID. Extend it to also work with zombie IDs. The simplest approach: add a `targetType` field to combat state — `'animal'` or `'zombie'` — so the combat code knows which array to look up the target in.
+### ⚠️ Combat target tracking — HIGH-RISK REFACTOR
 
-Specifically, look at how `state.combatTarget` is currently set and read in:
-- `App.jsx` or `useGameLoop.js` — wherever click-to-attack is handled
-- The auto-attack loop in `useGameLoop.js`
-- `CombatOverlay.jsx` — HP bar display over target
+The existing `state.combatTarget` system tracks the player's current attack target. **Before modifying it, read how `combatTarget` is currently stored and used.** It may be a plain number (animal ID), an object, or something else.
 
-Extend all of these to support `{ id, type: 'zombie' }` in addition to the current animal targeting.
+**Read these files first and confirm the current shape:**
+- `App.jsx` — wherever click-to-attack sets `combatTarget`
+- `useGameLoop.js` — the auto-attack loop that reads `combatTarget`
+- `CombatOverlay.jsx` — HP bar display that reads `combatTarget`
+
+**Recommended approach (least-invasive):** Rather than changing `combatTarget` from a number to an object `{ id, type }` (which would break every existing reference), add a SEPARATE field:
+
+```js
+state.combatTarget      // keep as-is (animal ID or zombie ID — just a number)
+state.combatTargetType  // NEW: 'animal' | 'zombie' | null
+```
+
+This way existing animal combat code continues to work unchanged — it reads `combatTarget` as a number and looks up the animal. Zombie combat sets `combatTargetType = 'zombie'` so the lookup goes to `state.zombies` instead of `state.animals`. The auto-attack loop checks `combatTargetType` to decide which array to search.
+
+**If `combatTarget` is already an object**, adapt accordingly — but verify first. Don't assume the shape.
 
 ## Rendering
 
@@ -136,7 +147,8 @@ In `MapView.jsx`, render zombies on the map the same way animals are rendered:
 
 In `src/logic/saveLoad.js`:
 - Add `zombies: []` to save state
-- Migration: backfill `zombies: []` for older saves
+- Add `combatTargetType: null` to save state
+- Migration: backfill `zombies: []` and `combatTargetType: null` for older saves
 - Persist all zombie fields including `lastAttackMs`
 - On load, call `resetZombieIds()` and set counter to `max(existing IDs) + 1`
 
@@ -149,10 +161,10 @@ In `src/logic/saveLoad.js`:
 **Modify:**
 - `src/hooks/useGameLoop.js` — add zombie AI tick (after animal AI section)
 - `src/components/MapView.jsx` — render zombies
-- `src/components/CombatOverlay.jsx` — show HP bar over targeted zombie
-- `src/logic/saveLoad.js` — persist zombies
-- `App.jsx` — extend click-to-attack to support zombie targets
-- Combat target state — add `targetType` discrimination
+- `src/components/CombatOverlay.jsx` — show HP bar over targeted zombie (check `combatTargetType`)
+- `src/logic/saveLoad.js` — persist zombies + combatTargetType
+- `App.jsx` — extend click-to-attack to support zombie targets (set `combatTargetType`)
+- Combat target state — add `combatTargetType` field (NOT restructure `combatTarget`)
 
 ## Acceptance criteria
 
@@ -166,6 +178,7 @@ In `src/logic/saveLoad.js`:
 - [ ] Combat overlay (HP bar) works on zombies
 - [ ] Save/load preserves zombie state
 - [ ] Wilderness Mode: zombies array stays empty, no zombie code runs
+- [ ] Existing animal combat is completely unchanged
 
 ## Constraints
 
@@ -180,8 +193,8 @@ Commit message: `feat: shambler zombie entity with AI movement and combat`
 
 1. Read `useGameLoop.js` — understand the animal AI tick and combat loop
 2. Read `MapView.jsx` — understand how animals render
-3. Read combat target tracking in `App.jsx` and `CombatOverlay.jsx`
-4. Propose the zombie AI integration points
+3. **Read combat target tracking in `App.jsx` and `CombatOverlay.jsx` — confirm the current shape of `combatTarget` before modifying anything**
+4. Propose the zombie AI integration points, including whether `combatTarget` is a number or object
 5. Wait for go-ahead
 6. Implement: data → logic → game loop integration → rendering → combat targeting → save/load
 7. Note what to playtest
