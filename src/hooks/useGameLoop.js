@@ -15,6 +15,7 @@ import {
   computePlayerRange,
 } from '../data/combat.js';
 import { HARVEST_SWING_MS, HARVEST_STAMINA_FLOOR, HARVEST_RANGE } from '../data/harvest.js';
+import { MODE_CONFIG } from '../data/modeConfig.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -130,8 +131,10 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         }
         if (map[s.player.y] && map[s.player.y][s.player.x] === T.CAVE) inShelter = true;
 
-        let warmthDelta = -0.3;
-        if (isNight) warmthDelta = -0.7;
+        const warmthBase = MODE_CONFIG[s.mode || 'wilderness'].warmthDrain;
+        // 7/3 preserves the wilderness day/night ratio (-0.3 / -0.7) for any mode's base.
+        let warmthDelta = -warmthBase;
+        if (isNight) warmthDelta = -warmthBase * (7 / 3);
         if (s.weather === 'blizzard') warmthDelta -= 0.5;
         if (s.eventEffects.coldSnap) warmthDelta -= 0.4;
         if (s.eventEffects.aurora && isNight) warmthDelta += 0.3;
@@ -144,7 +147,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         if (s.day <= 3 && warmthDelta < 0) warmthDelta *= 0.8;
         s.player.warmth = Math.max(0, Math.min(s.player.maxWarmth ?? 100, s.player.warmth + warmthDelta * TIME_SCALE));
 
-        const hungerDrain = 0.15 * (prof.mods.hungerDrain || 1) * TIME_SCALE;
+        const hungerBase = MODE_CONFIG[s.mode || 'wilderness'].hungerDrain;
+        const hungerDrain = hungerBase * (prof.mods.hungerDrain || 1) * TIME_SCALE;
         s.player.hunger = Math.max(0, s.player.hunger - hungerDrain);
         if (!moveTarget) s.player.stamina = Math.min(s.player.maxStamina ?? 100, s.player.stamina + 0.5);
         if (s.player.warmth < 20) {
