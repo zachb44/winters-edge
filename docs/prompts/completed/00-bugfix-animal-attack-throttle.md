@@ -2,8 +2,6 @@
 
 **STATUS: COMPLETED** — Fixed in commit 829095e.
 
-Copy this entire block into Claude Code as a single prompt.
-
 ---
 
 ## The bug
@@ -22,4 +20,4 @@ The animal AI section of the game loop was not properly updating `animal.lastAtt
 
 Fix: Each animal now has a `lastAttackMs` field on its state object. After applying damage, `animal.lastAttackMs = now` is set. The same animal can never apply damage twice in a single tick.
 
-Commit: `fix: animal attack speed throttle (was firing every tick instead of per attackSpeed)`
+Commit: `fix: animal attack speed throttle (was firing every tick instead of per attackSpeed)` — 829095e
