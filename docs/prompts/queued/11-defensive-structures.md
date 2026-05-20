@@ -131,9 +131,20 @@ Spike traps are walkable tiles that damage zombies:
 3. Spike traps do NOT damage animals or the player — only zombies
 4. Spike traps are visible on the map (the player placed them knowingly)
 
+### ⚠️ Spike trap consumption model — per-zombie, not per-tick
+
+Spike traps trigger **once per zombie** that enters the tile, not once per tick. If 5 zombies move onto a spike trap tile in the same tick, the trap triggers 5 times: it deals 15 damage to each of the first 3 zombies (consuming all 3 uses), then the trap is destroyed and the remaining 2 zombies pass through unharmed.
+
+Process zombie movement in order — first zombie to enter the tile takes damage, uses decrement, next zombie checks if uses remain. This means:
+- 1 zombie walks in → 15 damage, 2 uses left
+- 3 zombies walk in same tick → 15 damage each to all 3, 0 uses left, trap destroyed
+- 10 zombies walk in same tick → 15 damage to first 3, trap destroyed, remaining 7 pass through
+
+This is the correct balance: spike traps thin the leading edge of a horde but can't stop a wave alone. A single trap is worth 45 total damage (kills one shambler, damages two) for 3 wood + 3 stone + 1 scrap.
+
 ### Implementation
 
-In the zombie movement tick, after a zombie moves to a new tile, check if that tile has a spike trap. If so, apply damage and decrement uses.
+In the zombie movement tick, after a zombie moves to a new tile, check if that tile has a spike trap with `usesLeft > 0`. If so, apply damage and decrement uses. If uses reach 0, remove the trap. Process zombies sequentially so uses decrement correctly across multiple zombies in the same tick.
 
 ## Repair mechanic
 
@@ -196,7 +207,7 @@ In `MapView.jsx`, extend tooltips for placed defensive structures:
 - [ ] Zombies attack destructible buildings that block their path
 - [ ] Building HP decreases from zombie attacks
 - [ ] Buildings are destroyed (removed) when HP reaches 0
-- [ ] Spike traps damage zombies that walk over them
+- [ ] Spike traps damage zombies that walk over them — per-zombie, not per-tick
 - [ ] Spike traps are consumed after 3 uses
 - [ ] Player can repair damaged barricades/walls using resources
 - [ ] Damaged structures show visual HP indicator
@@ -225,3 +236,4 @@ Commit message: `feat: defensive structures (barricade, reinforced wall, spike t
 7. Wait for go-ahead
 8. Implement: building data → build menu → zombie attack logic → spike trap → repair → visual indicators → save/load
 9. Test: build a barricade line, let zombies attack it, verify HP decreases and building breaks
+10. **Test: place spike trap in front of a horde, verify per-zombie triggering and correct use consumption**
