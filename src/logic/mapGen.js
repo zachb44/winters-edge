@@ -10,6 +10,20 @@ import { MAP_W, MAP_H } from '../constants.js';
 // Two supply crates sit on the floor at (51,7) and (53,7); those are
 // returned as entity records (state.crates) rather than map tiles, matching
 // the existing supply-drop crate system.
+// 3x2 cabin shell: lootable cabin tile at (cx, cy) with cabin floor tiles
+// in a row beside it and a row in front, so cabins read as small shelters
+// rather than floating emojis.
+function placeCabinCluster(map, cx, cy) {
+  for (let dy = 0; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (!map[y] || map[y][x] === undefined) continue;
+      map[y][x] = T.CABIN_FLOOR;
+    }
+  }
+  map[cy][cx] = T.CABIN;
+}
+
 function placeOutpost(map) {
   for (let y = 3; y <= 12; y++) {
     for (let x = 46; x <= 57; x++) {
@@ -108,12 +122,24 @@ export function genMap(crashSite = null, mode = 'wilderness') {
       }
     }
   }
-  map[startY][startX] = T.PLANE;
-  if (map[startY] && map[startY][startX + 1] !== undefined) map[startY][startX + 1] = T.PLANE;
-  if (map[startY - 1] && map[startY - 1][startX] !== undefined) map[startY - 1][startX] = T.PLANE;
+  // Plane crash cluster — 5x3 centered on crash site. Scorched ground top
+  // and bottom, wreckage wings extending left and right, single lootable
+  // plane tile in the center. LOOT_BUDGET[T.PLANE] is bumped to compensate
+  // for going from 3 plane tiles to 1.
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const x = startX + dx, y = startY + dy;
+      if (!map[y] || map[y][x] === undefined) continue;
+      if (dy === 0) {
+        map[y][x] = (dx === 0) ? T.PLANE : T.WRECKAGE_METAL;
+      } else {
+        map[y][x] = T.SCORCHED_GROUND;
+      }
+    }
+  }
 
-  map[6][35] = T.CABIN;
-  map[5][7] = T.CABIN;
+  placeCabinCluster(map, 35, 6);
+  placeCabinCluster(map, 7, 5);
   map[40][3] = T.TOWER;
   for (let y = 38; y <= 42; y++) {
     for (let x = 1; x <= 5; x++) {

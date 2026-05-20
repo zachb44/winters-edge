@@ -2,6 +2,7 @@ export const T = {
   SNOW: 0, TREE: 1, ROCK: 2, ICE: 3, WATER: 4,
   PLANE: 5, CABIN: 6, CAVE: 7, SAPLING: 8, TOWER: 9, CRATE: 10,
   MILITARY_FLOOR: 11, SANDBAG: 12, WATCHTOWER: 13, ARMORY: 14, BARRACKS: 15,
+  WRECKAGE_METAL: 16, SCORCHED_GROUND: 17, CABIN_FLOOR: 18,
 };
 
 export const CRASH_SITES = [
@@ -34,4 +35,7 @@ export const TILE_DATA = {
   [T.WATCHTOWER]: { color: '#3a3a3a', walkable: false, name: 'Watchtower', emoji: '🏗️' },
   [T.ARMORY]: { color: '#4a3a2a', walkable: false, name: 'Armory', emoji: '🏚️' },
   [T.BARRACKS]: { color: '#5a4a3a', walkable: false, name: 'Barracks', emoji: '🏚️' },
+  [T.WRECKAGE_METAL]: { color: '#7a7a7a', walkable: true, name: 'Wreckage' },
+  [T.SCORCHED_GROUND]: { color: '#3a2820', walkable: true, name: 'Scorched Ground' },
+  [T.CABIN_FLOOR]: { color: '#6b4a32', walkable: true, name: 'Cabin Floor' },
 };

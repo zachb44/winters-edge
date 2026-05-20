@@ -1,6 +1,6 @@
 import { T } from './tiles.js';
 
-export const LOOT_BUDGET = { [T.PLANE]: 3, [T.CABIN]: 4, [T.ARMORY]: 4, [T.BARRACKS]: 3 };
+export const LOOT_BUDGET = { [T.PLANE]: 9, [T.CABIN]: 4, [T.ARMORY]: 4, [T.BARRACKS]: 3 };
 
 export const LOOT_TABLES = {
   plane: {
