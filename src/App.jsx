@@ -549,6 +549,9 @@ export default function WintersEdge() {
       const nb = { type: selectedBuild, x: tx, y: ty };
       if (selectedBuild === 'campfire') nb.fuel = 10;
       if (selectedBuild === 'trap') nb.caught = false;
+      const def = BUILDINGS[selectedBuild];
+      if (def.hp) { nb.hp = def.hp; nb.maxHp = def.maxHp; }
+      if (def.uses) { nb.usesLeft = def.uses; }
       s.buildings = [...s.buildings, nb];
       s = gainXp(s, 'crafting', 10);
       s = applyXp(s, XP_REWARDS.buildStructure);
@@ -608,6 +611,24 @@ export default function WintersEdge() {
           s.buildings = s.buildings.map(x => x === b ? { ...x, caught: false } : x);
           s = addLog(s, '🐰 Trap caught small game (+1 meat)');
         } else s = addLog(s, 'Trap is empty.');
+      } else if (b.type === 'barricade' || b.type === 'reinforced_wall') {
+        const def = BUILDINGS[b.type];
+        if ((b.hp ?? def.hp) >= (b.maxHp ?? def.maxHp)) {
+          s = addLog(s, '🛡️ Already at full HP.');
+        } else {
+          const repairCost = b.type === 'barricade'
+            ? { wood: 2, stone: 0 }
+            : { wood: 1, stone: 2 };
+          if (s.inventory.wood < repairCost.wood || s.inventory.stone < repairCost.stone) {
+            s = addLog(s, 'Not enough resources to repair.');
+          } else {
+            s.inventory.wood -= repairCost.wood;
+            s.inventory.stone -= repairCost.stone;
+            const newHp = Math.min(b.maxHp ?? def.maxHp, (b.hp ?? def.hp) + 25);
+            s.buildings = s.buildings.map(x => x === b ? { ...x, hp: newHp } : x);
+            s = addLog(s, `🔨 Repaired ${def.name.toLowerCase()} (+25 HP)`);
+          }
+        }
       }
       return s;
     });

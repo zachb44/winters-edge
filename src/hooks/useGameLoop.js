@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MAP_W, MAP_H, TIME_SCALE } from '../constants.js';
 import { T, TILE_DATA } from '../data/tiles.js';
 import { PROFESSIONS } from '../data/professions.js';
+import { BUILDINGS } from '../data/buildings.js';
 import { rollDailyEvent } from '../data/events.js';
 import { newAnimalId } from '../logic/animals.js';
 import { applyAttack } from '../logic/combat.js';
@@ -368,6 +369,13 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           return s;
         }
 
+        // Set of "x,y" keys for buildings that block movement. Rebuilt per
+        // tick (cheap at current scale) — used by animal and zombie movement.
+        const blockingBuildingKeys = new Set();
+        for (const b of s.buildings) {
+          if (BUILDINGS[b.type]?.walkable === false) blockingBuildingKeys.add(`${b.x},${b.y}`);
+        }
+
         // Animal movement (every 8 ticks). Animals engaged with the player
         // (player.combatTarget === a.id) stay locked in their tile.
         if (tickRef.current % 8 === 0) {
@@ -399,7 +407,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               if (wakeNow) {
                 nx = Math.max(0, Math.min(W - 1, nx));
                 ny = Math.max(0, Math.min(H - 1, ny));
-                if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
+                if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable
+                    && !blockingBuildingKeys.has(`${nx},${ny}`)) {
                   return { ...a, x: nx, y: ny, aggro: true };
                 }
                 return { ...a, aggro: true };
@@ -448,7 +457,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
 
             nx = Math.max(0, Math.min(W - 1, nx));
             ny = Math.max(0, Math.min(H - 1, ny));
-            if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
+            if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable
+                && !blockingBuildingKeys.has(`${nx},${ny}`)) {
               return { ...a, x: nx, y: ny };
             }
             return a;
@@ -487,36 +497,95 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             return s;
           }
 
-          // Movement pass — each zombie moves on its own cadence.
-          s.zombies = s.zombies.map(z => {
-            if (z.hp <= 0) return z;
-            // Locked-in target zombie stays still (mirrors animal behavior on
-            // the player's combat target).
-            if (s.combatTargetType === 'zombie' && s.combatTarget === z.id) return z;
+          // Movement pass — sequential per zombie so that building HP and
+          // spike-trap usesLeft mutate in order across zombies in the same tick.
+          // We rebuild s.zombies and s.buildings as we go.
+          const nextZombies = new Array(s.zombies.length);
+          for (let zi = 0; zi < s.zombies.length; zi++) {
+            const z = s.zombies[zi];
+            if (z.hp <= 0) { nextZombies[zi] = z; continue; }
+            if (s.combatTargetType === 'zombie' && s.combatTarget === z.id) { nextZombies[zi] = z; continue; }
             let cadence = zombieTicksPerMove(ZOMBIE_TYPES[z.type].moveSpeed);
             cadence = Math.max(1, Math.round(cadence / (s.zombieSpeedMultiplier || 1)));
             if (s.weather === 'blizzard') cadence = Math.max(1, Math.round(cadence * 1.33));
-            if (tick - (z.lastMoveTick || 0) < cadence) return z;
+            if (tick - (z.lastMoveTick || 0) < cadence) { nextZombies[zi] = z; continue; }
             const dx = s.player.x - z.x;
             const dy = s.player.y - z.y;
-            if (dx === 0 && dy === 0) return z;
-            // Try primary axis first, then secondary if blocked.
+            if (dx === 0 && dy === 0) { nextZombies[zi] = z; continue; }
             const primaryX = Math.abs(dx) >= Math.abs(dy);
             const tryMoves = primaryX
               ? [[Math.sign(dx), 0], [0, Math.sign(dy)]]
               : [[0, Math.sign(dy)], [Math.sign(dx), 0]];
+
+            let resolved = null;
             for (const [mx, my] of tryMoves) {
               if (mx === 0 && my === 0) continue;
               const nx = z.x + mx, ny = z.y + my;
               if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
               if (!map[ny] || map[ny][nx] === undefined) continue;
               if (!TILE_DATA[map[ny][nx]].walkable) continue;
-              // Don't step onto the player's tile — attack from adjacent.
               if (nx === s.player.x && ny === s.player.y) continue;
-              return { ...z, x: nx, y: ny, lastMoveTick: tick };
+
+              const key = `${nx},${ny}`;
+              if (blockingBuildingKeys.has(key)) {
+                // Find the blocking building (always exists when key is set).
+                const bi = s.buildings.findIndex(bb => bb.x === nx && bb.y === ny && BUILDINGS[bb.type]?.walkable === false);
+                const blocker = s.buildings[bi];
+                const destructible = blocker && blocker.hp > 0;
+                if (destructible) {
+                  const zType = ZOMBIE_TYPES[z.type];
+                  if (now - (z.lastAttackMs || 0) >= zType.attackSpeed) {
+                    const newHp = blocker.hp - zType.damage;
+                    if (newHp <= 0) {
+                      // Destroy: remove from buildings, clear blocker key.
+                      s.buildings = s.buildings.filter((_, i) => i !== bi);
+                      blockingBuildingKeys.delete(key);
+                      s = addLog(s, `🧟 Shamblers destroyed your ${BUILDINGS[blocker.type].name.toLowerCase()}!`);
+                    } else {
+                      // Damage in place.
+                      const newBuildings = [...s.buildings];
+                      newBuildings[bi] = { ...blocker, hp: newHp };
+                      s.buildings = newBuildings;
+                    }
+                    resolved = { ...z, lastAttackMs: now, lungeUntil: now + 200, lastMoveTick: tick };
+                  } else {
+                    // Attack on cooldown — zombie waits, doesn't try other axis.
+                    resolved = { ...z, lastMoveTick: tick };
+                  }
+                  break;
+                }
+                // Indestructible blocker (wall) — try secondary axis.
+                continue;
+              }
+
+              // Tile is free: move there, then check for spike trap.
+              let movedZ = { ...z, x: nx, y: ny, lastMoveTick: tick };
+              const trapIdx = s.buildings.findIndex(bb => bb.x === nx && bb.y === ny && bb.type === 'spike_trap' && (bb.usesLeft ?? 0) > 0);
+              if (trapIdx !== -1) {
+                const trap = s.buildings[trapIdx];
+                const trapDef = BUILDINGS.spike_trap;
+                const trapDmg = trapDef.damage;
+                const zHpAfter = Math.max(0, movedZ.hp - trapDmg);
+                movedZ = { ...movedZ, hp: zHpAfter };
+                const newUses = (trap.usesLeft ?? 0) - 1;
+                if (newUses <= 0) {
+                  s.buildings = s.buildings.filter((_, i) => i !== trapIdx);
+                  s = addLog(s, `⚠️ Spike trap hits ${ZOMBIE_TYPES[z.type].name.toLowerCase()}! (-${trapDmg} HP) Trap destroyed.`);
+                } else {
+                  const newBuildings = [...s.buildings];
+                  newBuildings[trapIdx] = { ...trap, usesLeft: newUses };
+                  s.buildings = newBuildings;
+                  s = addLog(s, `⚠️ Spike trap hits ${ZOMBIE_TYPES[z.type].name.toLowerCase()}! (-${trapDmg} HP)`);
+                }
+                if (onPlayerSwing) onPlayerSwing({ dmg: trapDmg, lethal: zHpAfter <= 0, x: nx, y: ny });
+              }
+              resolved = movedZ;
+              break;
             }
-            return { ...z, lastMoveTick: tick };
-          });
+
+            nextZombies[zi] = resolved ?? { ...z, lastMoveTick: tick };
+          }
+          s.zombies = nextZombies;
         }
 
         // ===== Wave management (outbreak only) =====

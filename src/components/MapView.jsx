@@ -148,6 +148,16 @@ export function MapView({
           const vis = visibilityAt(fog, state.player.x, state.player.y, b.x, b.y);
           if (vis === 0) return null;
           const isLitFire = b.type === 'campfire' && b.fuel > 0;
+          const def = BUILDINGS[b.type];
+          const hpPct = (b.hp !== undefined && b.maxHp) ? b.hp / b.maxHp : null;
+          const lowHp = hpPct !== null && hpPct < 0.25;
+          const midHp = hpPct !== null && hpPct >= 0.25 && hpPct < 0.75;
+          let baseFilter = 'none';
+          if (vis === 1) baseFilter = 'brightness(0.5)';
+          else if (b.type === 'campfire' && b.fuel <= 0) baseFilter = 'grayscale(1) opacity(0.5)';
+          else if (lowHp) baseFilter = 'drop-shadow(0 0 4px rgba(255,0,0,0.9))';
+          const anim = isLitFire ? 'flicker 0.5s ease-in-out infinite alternate'
+            : (lowHp ? 'flicker 0.5s ease-in-out infinite alternate' : 'none');
           return (
             <div key={`b-${i}`}>
               {isLitFire && vis === 2 && (
@@ -163,11 +173,12 @@ export function MapView({
               <div className="absolute flex items-center justify-center pointer-events-none"
                 style={{
                   left: (b.x - view.x) * TILE, top: (b.y - view.y) * TILE, width: TILE, height: TILE, fontSize: 24,
-                  filter: vis === 1 ? 'brightness(0.5)' : (b.type === 'campfire' && b.fuel <= 0 ? 'grayscale(1) opacity(0.5)' : 'none'),
-                  animation: isLitFire ? 'flicker 0.5s ease-in-out infinite alternate' : 'none',
+                  filter: baseFilter,
+                  animation: anim,
                 }}>
-                {BUILDINGS[b.type].emoji}
+                {def.emoji}
                 {b.type === 'trap' && b.caught && <span className="absolute text-xs">!</span>}
+                {midHp && <span className="absolute text-xs" style={{ top: -6, right: -2 }}>⚠️</span>}
               </div>
             </div>
           );
@@ -338,18 +349,28 @@ export function MapView({
           const lc = state.lootCounts || {};
           const remaining = key in lc ? lc[key] : LOOT_BUDGET[tile];
           let text = null;
-          if (tile === T.TREE) text = '🌲 Tree — Click to chop for wood';
-          else if (tile === T.ROCK) text = '🪨 Rock — Click to mine for stone';
-          else if (tile === T.PLANE) text = remaining > 0 ? `✈️ Plane Wreckage — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
-          else if (tile === T.CABIN) text = remaining > 0 ? `🏚️ Abandoned Cabin — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
-          else if (tile === T.ARMORY) text = remaining > 0 ? `🪖 Armory — Click to search (${remaining} uses left)` : 'Armory — Searched';
-          else if (tile === T.BARRACKS) text = remaining > 0 ? `🛏️ Barracks — Click to search (${remaining} uses left)` : 'Barracks — Searched';
-          else if (tile === T.WATCHTOWER) text = '🏗️ Watchtower';
-          else if (tile === T.SANDBAG) text = '🟤 Sandbag Wall';
-          else if (tile === T.MILITARY_FLOOR) text = '🟫 Concrete Floor';
-          else if (tile === T.CAVE) text = '🕳️ Cave — Walkable shelter';
-          else if (tile === T.TOWER) text = '📡 Radio Tower — Reach with 10 food, 5 wood, coat to win';
-          else if (tile === T.SPAWN_ZONE) {
+          const hoveredBuilding = state.buildings.find(b => b.x === hover.x && b.y === hover.y);
+          if (hoveredBuilding) {
+            const bDef = BUILDINGS[hoveredBuilding.type];
+            if (hoveredBuilding.type === 'spike_trap') {
+              text = `⚠️ ${bDef.name} — ${hoveredBuilding.usesLeft ?? bDef.uses} uses left`;
+            } else if (hoveredBuilding.hp !== undefined && hoveredBuilding.maxHp !== undefined) {
+              text = `${bDef.emoji} ${bDef.name} — HP: ${hoveredBuilding.hp}/${hoveredBuilding.maxHp}`;
+            }
+          }
+          if (!text) {
+            if (tile === T.TREE) text = '🌲 Tree — Click to chop for wood';
+            else if (tile === T.ROCK) text = '🪨 Rock — Click to mine for stone';
+            else if (tile === T.PLANE) text = remaining > 0 ? `✈️ Plane Wreckage — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
+            else if (tile === T.CABIN) text = remaining > 0 ? `🏚️ Abandoned Cabin — Click to loot (${remaining} uses left)` : 'Picked clean — nothing left here';
+            else if (tile === T.ARMORY) text = remaining > 0 ? `🪖 Armory — Click to search (${remaining} uses left)` : 'Armory — Searched';
+            else if (tile === T.BARRACKS) text = remaining > 0 ? `🛏️ Barracks — Click to search (${remaining} uses left)` : 'Barracks — Searched';
+            else if (tile === T.WATCHTOWER) text = '🏗️ Watchtower';
+            else if (tile === T.SANDBAG) text = '🟤 Sandbag Wall';
+            else if (tile === T.MILITARY_FLOOR) text = '🟫 Concrete Floor';
+            else if (tile === T.CAVE) text = '🕳️ Cave — Walkable shelter';
+            else if (tile === T.TOWER) text = '📡 Radio Tower — Reach with 10 food, 5 wood, coat to win';
+            else if (tile === T.SPAWN_ZONE) {
             // Look up which zone this tile belongs to (within ±1 of center).
             const zone = SPAWN_ZONES.find(z =>
               Math.abs(z.x - hover.x) <= 1 && Math.abs(z.y - hover.y) <= 1
@@ -360,6 +381,7 @@ export function MapView({
                 : '';
               text = `${zone.emoji} ${zone.name} — ${zone.desc}${warn}`;
             }
+          }
           }
           if (!text) return null;
           const left = (hover.x - view.x) * TILE + TILE + 4;
