@@ -10,6 +10,8 @@ import { applyHarvest } from '../logic/harvest.js';
 import { applyXp, XP_REWARDS } from '../data/leveling.js';
 import {
   ANIMAL_ATTACK_SPEED,
+  ANIMAL_DAMAGE,
+  ENGAGEMENT_CHARGE_MS,
   STAMINA_COST_PER_SWING,
   STAMINA_FLOOR_TO_SWING,
   computePlayerAttackSpeed,
@@ -235,6 +237,16 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           });
         }
 
+        // Corpse decay: drop corpses older than 4 in-game hours.
+        if ((s.corpses || []).length > 0) {
+          const nowHours = s.day * 24 + s.time;
+          const fresh = s.corpses.filter(c => {
+            const spawned = c.spawnDay * 24 + c.spawnTime;
+            return nowHours - spawned < 4;
+          });
+          if (fresh.length !== s.corpses.length) s.corpses = fresh;
+        }
+
         const newTrees = { ...s.trees };
         for (const key in newTrees) {
           newTrees[key] -= 0.2 * s.gameSpeed * TIME_SCALE / 24;
@@ -292,7 +304,15 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               s = result.state;
               if (result.hit) {
                 s.player = { ...s.player, lastAttackMs: now, lungeUntil: now + 200, stamina: Math.max(0, s.player.stamina) };
-                if (onPlayerSwing) onPlayerSwing({ dmg: result.hit.dmg, lethal: result.hit.lethal, x: result.hit.x, y: result.hit.y });
+                if (onPlayerSwing) onPlayerSwing({
+                  dmg: result.hit.dmg,
+                  lethal: result.hit.lethal,
+                  x: result.hit.x,
+                  y: result.hit.y,
+                  fromX: s.player.x,
+                  fromY: s.player.y,
+                  weaponType: s.inventory.rifle > 0 ? 'rifle' : (s.inventory.hunting_bow > 0 ? 'bow' : null),
+                });
               }
             }
           }
@@ -339,16 +359,23 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         // and the throttle never takes effect).
         const updatedAnimals = s.animals.map(a => {
           if (a.hp <= 0 || !a.hostile) return a;
-          if (isFirstNight) return a;
           const attackMs = ANIMAL_ATTACK_SPEED[a.type];
           if (!attackMs) return a;
           const d = Math.abs(a.x - s.player.x) + Math.abs(a.y - s.player.y);
-          if (d > 1) return a;
-          // Wolves attack adjacent player regardless of day/night now.
-          // Boars need aggro (set by proximity in the movement block).
+          // Clear engagement charge when out of attack range so re-engaging
+          // triggers a fresh delay.
+          if (d > 1) {
+            return a.engagementChargedAt ? { ...a, engagementChargedAt: null } : a;
+          }
+          if (isFirstNight) return a;
           if (a.type === 'boar' && !a.aggro) return a;
+          // Charging delay on first adjacency.
+          if (a.engagementChargedAt == null) {
+            return { ...a, engagementChargedAt: now + ENGAGEMENT_CHARGE_MS };
+          }
+          if (now < a.engagementChargedAt) return a;
           if (now - (a.lastAttackMs || 0) < attackMs) return a;
-          const baseDmg = a.type === 'wolf' ? 8 : a.type === 'boar' ? 12 : 20;
+          const baseDmg = ANIMAL_DAMAGE[a.type] || 8;
           let dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
           if (hasAbility(s, 'hardy') && s.player.warmth < 30) dmgTaken = Math.floor(dmgTaken * 0.7);
           if (hasAbility(s, 'iron_will') && s.player.hp < 30) dmgTaken = Math.floor(dmgTaken * 0.7);

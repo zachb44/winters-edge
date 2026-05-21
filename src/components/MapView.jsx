@@ -10,6 +10,7 @@ import { PredatorAlert } from './PredatorAlert.jsx';
 import { FloatingDamage } from './FloatingDamage.jsx';
 import { CombatOverlay } from './CombatOverlay.jsx';
 import { HarvestHpBars } from './HarvestHpBars.jsx';
+import { Projectile } from './Projectile.jsx';
 
 export function MapView({
   state, map, view, fog, mapScale,
@@ -17,6 +18,7 @@ export function MapView({
   hover, setHover, tooltipReady, selectedBuild,
   onTileClick,
   damageNumbers,
+  projectiles = [],
 }) {
   const now = Date.now();
   const target = state.combatTarget != null
@@ -129,6 +131,25 @@ export function MapView({
             </div>
           );
         })}
+
+        {(() => {
+          const byTile = {};
+          for (const c of (state.corpses || [])) {
+            if (c.x < view.x || c.x >= view.x + VIEW_W || c.y < view.y || c.y >= view.y + VIEW_H) continue;
+            const vis = visibilityAt(fog, state.player.x, state.player.y, c.x, c.y);
+            if (vis === 0) continue;
+            const k = `${c.x},${c.y}`;
+            if (!byTile[k]) byTile[k] = { x: c.x, y: c.y, n: 0 };
+            byTile[k].n += 1;
+          }
+          return Object.values(byTile).map(({ x, y, n }) => (
+            <div key={`corpse-${x}-${y}`} className="absolute flex items-center justify-center pointer-events-none"
+              style={{ left: (x - view.x) * TILE, top: (y - view.y) * TILE, width: TILE, height: TILE, fontSize: 22, opacity: 0.85 }}>
+              💀
+              {n > 1 && <span className="absolute bottom-0 right-0 text-[10px] font-bold text-amber-300 bg-slate-900/80 rounded px-1">{n}</span>}
+            </div>
+          ));
+        })()}
 
         {state.pendingCarcass &&
          state.pendingCarcass.x >= view.x && state.pendingCarcass.x < view.x + VIEW_W &&
@@ -340,6 +361,7 @@ export function MapView({
         <CombatOverlay combatTarget={state.combatTarget} combatTargetType={state.combatTargetType} animals={state.animals} zombies={state.zombies || []} player={state.player} view={view} />
         <HarvestHpBars tileHp={state.tileHp} map={map} view={view} />
         <FloatingDamage items={damageNumbers} view={view} />
+        {projectiles.map(p => <Projectile key={`proj-${p.id}`} p={p} view={view} />)}
         <PredatorAlert predator={nearbyPredator} />
 
         {tooltipReady && hover && (() => {
@@ -349,7 +371,15 @@ export function MapView({
           const lc = state.lootCounts || {};
           const remaining = key in lc ? lc[key] : LOOT_BUDGET[tile];
           let text = null;
-          const hoveredBuilding = state.buildings.find(b => b.x === hover.x && b.y === hover.y);
+          const hoveredCorpses = (state.corpses || []).filter(c => c.x === hover.x && c.y === hover.y);
+          if (hoveredCorpses.length > 0) {
+            const allDrops = hoveredCorpses.flatMap(c => c.loot);
+            const summary = allDrops.length === 0
+              ? 'empty'
+              : allDrops.map(d => `${d.qty}× ${d.item.replace(/_/g, ' ')}`).join(', ');
+            text = `💀 Corpse${hoveredCorpses.length > 1 ? ` ×${hoveredCorpses.length}` : ''} — ${summary}`;
+          }
+          const hoveredBuilding = !text ? state.buildings.find(b => b.x === hover.x && b.y === hover.y) : null;
           if (hoveredBuilding) {
             const bDef = BUILDINGS[hoveredBuilding.type];
             if (hoveredBuilding.type === 'spike_trap') {

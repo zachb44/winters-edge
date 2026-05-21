@@ -2,6 +2,7 @@ import { PROFESSIONS } from '../data/professions.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { getUnlocksAt } from '../data/abilities.js';
 import { resetZombieIds } from './zombies.js';
+import { resetCorpseIds } from './combat.js';
 
 export const SAVE_KEY = 'wintersedge.save.v1';
 
@@ -44,11 +45,20 @@ export function loadGame() {
     } else {
       resetZombieIds(1);
     }
+    const corpses = Array.isArray(state.corpses) ? state.corpses : [];
+    if (corpses.length > 0) {
+      const maxCid = corpses.reduce((m, c) => Math.max(m, c.id || 0), 0);
+      resetCorpseIds(maxCid + 1);
+    } else {
+      resetCorpseIds(1);
+    }
+
     return {
       ...data,
       state: {
         ...state,
         buildings: migratedBuildings,
+        corpses,
         mode: state.mode ?? 'wilderness',
         combatTarget: state.combatTarget ?? null,
         combatTargetType: state.combatTargetType ?? null,

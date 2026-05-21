@@ -145,6 +145,7 @@ export function applyZombieAttack(prev, zombieId) {
       lethal = true;
       const type = ZOMBIE_TYPES[z.type];
       let msg = `🧟 ${type.name} destroyed!`;
+      // TODO: spawn corpse instead of auto-loot (deferred — see seed 13 corpse system)
       for (const drop of type.loot) {
         if (Math.random() < drop.chance) {
           s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;

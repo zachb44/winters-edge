@@ -21,6 +21,7 @@ import { GameUI } from './components/GameUI.jsx';
 import { MapView } from './components/MapView.jsx';
 import { LogPanel } from './components/LogPanel.jsx';
 import { AbilityHotbar } from './components/AbilityHotbar.jsx';
+import { Projectile } from './components/Projectile.jsx';
 import { BuildMenu } from './components/BuildMenu.jsx';
 import { InventoryMenu } from './components/InventoryMenu.jsx';
 import { SkillsMenu } from './components/SkillsMenu.jsx';
@@ -63,6 +64,7 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
     buildings: [],
     animals: [],
     crates: [],
+    corpses: [],
     trees: {},
     weather: 'clear',
     log: [{ msg: `${charName} the ${prof.name} wakes in the wreckage. Cold. Alone.`, day: 1, time: 8 }],
@@ -122,6 +124,19 @@ export default function WintersEdge() {
   const [dayBanner, setDayBanner] = useState(null);
   const [tooltipReady, setTooltipReady] = useState(false);
   const [damageNumbers, setDamageNumbers] = useState([]);
+  const [projectiles, setProjectiles] = useState([]);
+  const projectileIdRef = useRef(0);
+  const [, forceTickRender] = useState(0);
+  useEffect(() => {
+    if (projectiles.length === 0) return;
+    let raf;
+    const tick = () => {
+      forceTickRender(n => n + 1);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [projectiles.length]);
   const [levelUpBanner, setLevelUpBanner] = useState(null);
   const [statModalOpen, setStatModalOpen] = useState(false);
   const damageIdRef = useRef(0);
@@ -466,6 +481,26 @@ export default function WintersEdge() {
     });
   };
 
+  const lootCorpse = (corpse) => {
+    setState(prev => {
+      let s = { ...prev, inventory: { ...prev.inventory } };
+      if (!corpse.loot || corpse.loot.length === 0) {
+        s.corpses = (s.corpses || []).filter(c => c.id !== corpse.id);
+        s = addLog(s, '💀 Nothing useful left.');
+        return s;
+      }
+      let msg = '💀 Looted:';
+      for (const drop of corpse.loot) {
+        s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
+        const info = ITEM_INFO[drop.item];
+        msg += ` +${drop.qty}${info?.icon || ''}`;
+      }
+      s.corpses = (s.corpses || []).filter(c => c.id !== corpse.id);
+      s = addLog(s, msg);
+      return s;
+    });
+  };
+
   const lootCrate = (crate) => {
     setState(prev => {
       let s = { ...prev, inventory: { ...prev.inventory } };
@@ -525,8 +560,28 @@ export default function WintersEdge() {
   }, []);
 
   const onPlayerSwing = useCallback((hit) => {
-    addDamageNumber({ x: hit.x, y: hit.y, value: hit.dmg, color: 'white' });
-    addHitFlash({ x: hit.x, y: hit.y, color: 'white' });
+    if (hit.weaponType === 'rifle' || hit.weaponType === 'bow') {
+      const duration = hit.weaponType === 'rifle' ? 120 : 200;
+      const id = projectileIdRef.current++;
+      setProjectiles(prev => [...prev, {
+        id,
+        fromX: hit.fromX,
+        fromY: hit.fromY,
+        toX: hit.x,
+        toY: hit.y,
+        type: hit.weaponType === 'rifle' ? 'rifle' : 'arrow',
+        startTime: Date.now(),
+        duration,
+      }]);
+      setTimeout(() => {
+        addDamageNumber({ x: hit.x, y: hit.y, value: hit.dmg, color: 'white' });
+        addHitFlash({ x: hit.x, y: hit.y, color: 'white' });
+        setProjectiles(prev => prev.filter(p => p.id !== id));
+      }, duration);
+    } else {
+      addDamageNumber({ x: hit.x, y: hit.y, value: hit.dmg, color: 'white' });
+      addHitFlash({ x: hit.x, y: hit.y, color: 'white' });
+    }
   }, [addDamageNumber, addHitFlash]);
 
   const onAnimalSwing = useCallback((hit) => {
@@ -821,6 +876,9 @@ export default function WintersEdge() {
     const crate = state.crates.find(c => c.x === tx && c.y === ty && !c.looted);
     if (crate && d <= 1) { lootCrate(crate); return; }
 
+    const corpse = (state.corpses || []).find(c => c.x === tx && c.y === ty);
+    if (corpse && d <= 1) { lootCorpse(corpse); return; }
+
     const zombie = state.zombies?.find(z => z.x === tx && z.y === ty && z.hp > 0);
     if (zombie) { engageZombie(zombie); return; }
 
@@ -886,6 +944,7 @@ export default function WintersEdge() {
             tooltipReady={tooltipReady} selectedBuild={selectedBuild}
             onTileClick={handleTileClick}
             damageNumbers={damageNumbers}
+            projectiles={projectiles}
           />
 
           <div className="flex flex-col gap-1 w-72 flex-shrink-0 min-h-0">

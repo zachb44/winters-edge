@@ -1,9 +1,27 @@
 import { PROFESSIONS } from '../data/professions.js';
-import { rollFromTable, ITEM_INFO } from '../data/loot.js';
+import { rollFromTable } from '../data/loot.js';
 import { pushLog } from './log.js';
 import { gainXp } from './progression.js';
 import { applyXp, XP_REWARDS, powerDamageMultiplier } from '../data/leveling.js';
 import { hasAbility } from './abilities.js';
+
+let _nextCorpseId = 1;
+export function newCorpseId() { return _nextCorpseId++; }
+export function resetCorpseIds(value = 1) { _nextCorpseId = value; }
+
+// Loot table per animal type. Bear is special: uses rollFromTable('bear').
+function buildAnimalLoot(animalType) {
+  switch (animalType) {
+    case 'rabbit': return [{ item: 'raw_meat', qty: 1 }];
+    case 'wolf':   return [{ item: 'raw_meat', qty: 2 }, { item: 'pelts', qty: 1 }];
+    case 'boar':   return [{ item: 'raw_meat', qty: 4 }];
+    case 'deer':   return [{ item: 'raw_meat', qty: 5 }, { item: 'pelts', qty: 1 }];
+    case 'seal':   return [{ item: 'raw_meat', qty: 3 }, { item: 'fat', qty: 2 }];
+    case 'raven':  return [{ item: 'raw_meat', qty: 1 }];
+    case 'bear':   return rollFromTable('bear');
+    default:       return [];
+  }
+}
 
 // Compute outgoing player damage against `animal`. Pure.
 export function computePlayerDamage(state, animal) {
@@ -44,29 +62,26 @@ export function applyAttack(prev, animalId) {
   const grantSkinMasterPelt = hasAbility(s, 'skin_master');
   let lethal = false;
 
+  let corpseLoot = null;
   const newAnimals = s.animals.map(a => {
     if (a.id !== animalId) return a;
     const newHp = a.hp - dmg;
     if (newHp <= 0) {
       lethal = true;
-      if (a.type === 'rabbit') { s.inventory.raw_meat += 1; s = pushLog(s, '🐰 Killed rabbit (+1 raw meat)'); }
-      else if (a.type === 'wolf') { s.inventory.raw_meat += 2; s.inventory.pelts += 1; s = pushLog(s, '🐺 Killed wolf (+2 meat, +1 pelt)'); }
-      else if (a.type === 'boar') { s.inventory.raw_meat += 4; s = pushLog(s, '🐗 Killed boar (+4 meat)'); }
-      else if (a.type === 'bear') {
-        const drops = rollFromTable('bear');
-        let msg = '🐻 KILLED THE BEAR!';
-        for (const drop of drops) {
-          s.inventory[drop.item] = (s.inventory[drop.item] || 0) + drop.qty;
-          msg += ` +${drop.qty}${ITEM_INFO[drop.item].icon}`;
-        }
-        s = pushLog(s, msg);
-      }
-      else if (a.type === 'deer') { s.inventory.raw_meat += 5; s.inventory.pelts += 1; s = pushLog(s, '🦌 Killed deer (+5 meat, +1 pelt)'); }
-      else if (a.type === 'seal') { s.inventory.raw_meat += 3; s.inventory.fat += 2; s = pushLog(s, '🦭 Killed seal (+3 meat, +2 fat)'); }
-      else if (a.type === 'raven') { s.inventory.raw_meat += 1; s = pushLog(s, '🦅 Killed raven (+1 meat)'); }
+      const killMessages = {
+        rabbit: '🐰 Killed rabbit.',
+        wolf:   '🐺 Killed wolf.',
+        boar:   '🐗 Killed boar.',
+        bear:   '🐻 KILLED THE BEAR!',
+        deer:   '🦌 Killed deer.',
+        seal:   '🦭 Killed seal.',
+        raven:  '🦅 Killed raven.',
+      };
+      s = pushLog(s, killMessages[a.type] || '✅ Killed.');
+      corpseLoot = buildAnimalLoot(a.type);
       if (grantSkinMasterPelt && a.type !== 'raven' && a.type !== 'rabbit') {
-        s.inventory.pelts = (s.inventory.pelts || 0) + 1;
-        s = pushLog(s, '🦊 Skin Master: +1 pelt');
+        corpseLoot = [...corpseLoot, { item: 'pelts', qty: 1 }];
+        s = pushLog(s, '🦊 Skin Master: +1 pelt on corpse');
       }
       s = gainXp(s, 'hunting', 15);
       s = applyXp(s, XP_REWARDS.killAnimal[a.type] || 0);
@@ -75,6 +90,19 @@ export function applyAttack(prev, animalId) {
     if (a.type === 'boar') return { ...a, hp: newHp, aggro: true };
     return { ...a, hp: newHp };
   });
+  if (lethal && corpseLoot) {
+    const corpse = {
+      id: newCorpseId(),
+      x: target.x,
+      y: target.y,
+      type: target.type,
+      loot: corpseLoot,
+      spawnDay: s.day,
+      spawnTime: s.time,
+    };
+    s.corpses = [...(s.corpses || []), corpse];
+    s = pushLog(s, '💀 A corpse remains. Click it to collect loot.');
+  }
   s.animals = newAnimals.filter(a => a.hp > 0);
   if (lethal && s.combatTarget === animalId) {
     s.combatTarget = null;

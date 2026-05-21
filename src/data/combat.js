@@ -14,6 +14,19 @@ export const ANIMAL_ATTACK_SPEED = {
   bear: 1700,
 };
 
+// Damage dealt per hostile-animal swing. Tuned down from 8/12/20 so the player
+// has time to react. Profession dmgReduction + Hardy/Iron Will stack on top.
+export const ANIMAL_DAMAGE = {
+  wolf: 5,
+  boar: 9,
+  bear: 14,
+};
+
+// First-engagement delay (ms): when a hostile animal first enters adjacency,
+// they "charge up" for this long before their first swing. Subsequent swings
+// use ANIMAL_ATTACK_SPEED. Resets when they break adjacency.
+export const ENGAGEMENT_CHARGE_MS = 600;
+
 export const ENGAGEMENT_RANGE = {
   melee: 1,
   bow: 3,
