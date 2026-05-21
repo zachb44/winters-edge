@@ -45,7 +45,7 @@ export const OUTBREAK_EVENT_TABLE = [
   { id: 'respite', weight: 6, min_day: 8, name: 'Quiet Night', desc: '🌙 The horde seems thin tonight. Wave size reduced by 50%.' },
   { id: 'screamer_spotted', weight: 5, min_day: 10, name: 'Screamer Spotted', desc: '😱 A screamer is in tonight\'s wave. It will call reinforcements. (Future: screamer zombie type. For now: +25% wave size.)' },
   { id: 'survivor_radio', weight: 4, min_day: 6, name: 'Survivor on the Radio', desc: '📻 A voice on the radio. "Hold on... we\'re coming." +50 XP for hope.' },
-  { id: 'fortify', weight: 6, min_day: 4, name: 'Time to Fortify', desc: '🛡️ Clear skies, calm winds. Building costs -2 wood today.' },
+  { id: 'fortify', weight: 6, min_day: 4, name: 'Time to Fortify', desc: '🛡️ Clear skies, calm winds. Building costs reduced today.' },
 ];
 ```
 
@@ -77,7 +77,10 @@ export function rollDailyEvent(day, mode = 'wilderness') {
 }
 ```
 
-Then find where `rollDailyEvent` is called in `useGameLoop.js` and pass `state.mode`.
+Then find where `rollDailyEvent` is called in `useGameLoop.js` (currently: `const event = rollDailyEvent(s.day);`) and pass `state.mode`:
+```js
+const event = rollDailyEvent(s.day, s.mode || 'wilderness');
+```
 
 ## Event effect implementation
 
@@ -86,21 +89,21 @@ Some of these events need actual gameplay effects beyond the log message. Find w
 ### Events with gameplay effects
 
 **`big_horde`** — Tonight's wave is 50% larger
-- Store a modifier on `state.wave` or `state.currentEvent`: `waveMultiplier: 1.5`
-- In the wave spawner (seed 03's `getWaveSize()`), multiply by this modifier
+- Store a modifier on state: `waveMultiplier: 1.5`
+- In the wave spawner (the `getWaveSize()` call in the wave management section of `useGameLoop.js`), multiply the result by `state.waveMultiplier`
 - Reset to 1.0 at dawn
 
 **`fast_zombies`** — Zombie move speed +50% tonight
 - Store `zombieSpeedMultiplier: 1.5` on state
-- In zombie movement tick (seed 02), apply this multiplier to move interval
-- Reset at dawn
+- In zombie movement tick, divide the `zombieTicksPerMove()` result by this multiplier (faster = fewer ticks between moves)
+- Reset to 1.0 at dawn
 
 **`weapon_cache`** — Instant loot
-- On event roll: `Math.random() > 0.5 ? state.inventory.rifle++ : state.inventory.hunting_bow++`
+- On event roll: `Math.random() > 0.5 ? s.inventory.rifle++ : s.inventory.hunting_bow++` (use `s.inventory = { ...s.inventory }` for immutability)
 - Log which weapon was found
 
 **`ammo_cache`** — Instant loot
-- `state.inventory.scrap += 5`
+- `s.inventory.scrap += 5`
 
 **`respite`** — Wave size halved
 - `waveMultiplier: 0.5`
@@ -112,42 +115,48 @@ Some of these events need actual gameplay effects beyond the log message. Find w
 - Future: when screamer zombie type exists, guarantee one spawns in the wave instead
 
 **`survivor_radio`** — XP bonus
-- `state.xp += 50` (or however character XP is awarded — check `src/data/leveling.js`)
+- **Use the existing XP system:** `s = applyXp(s, 50);` (import `applyXp` from `src/data/leveling.js`)
+- Do NOT use `state.xp += 50` — that bypasses the level-up threshold check
 
 **`fortify`** — Building cost reduction
 - Store `buildingCostReduction: 2` on state
-- In building placement code (wherever wood cost is checked), subtract this from wood cost (min 1)
-- Reset at dawn or next day
+- In the building placement handler in `App.jsx` (wherever `state.inventory.wood >= b.wood` is checked for building placement), subtract `state.buildingCostReduction` from BOTH the `b.wood` cost AND the `b.stone` cost when validating AND deducting. Use `Math.max(1, cost - reduction)` as floor so costs never go below 1.
+- Reset to 0 at the start of the next day (when a new event rolls)
 
-**`blizzard_warning` in Outbreak** — Same weather effect as wilderness, but add: zombies move 25% slower during blizzard
-- Apply `zombieSpeedMultiplier: 0.75` during blizzard weather
-- This stacks concept: bad weather helps defend
+**`blizzard_warning` in Outbreak** — Same weather effect as wilderness, plus zombie speed reduction
+- When blizzard weather is active (`state.weather === 'blizzard'`), apply zombie speed reduction
+- Implementation: in the zombie movement tick, check `state.weather === 'blizzard'` SEPARATELY from the event-based `zombieSpeedMultiplier`. If blizzard is active, multiply the ticks-per-move by 1.33 (i.e., 25% slower). This stacks with `fast_zombies` if both are active.
+- This check goes in the zombie movement pass in `useGameLoop.js`, NOT in the event handler
 
 ### Events with no new gameplay effect (just flavor/existing effects)
 
 - `calm` / `quiet day` — no effect
-- `aurora` — same as wilderness (reduced warmth drain)
-- `cold_snap` — same as wilderness (increased warmth drain)
-- `thaw` — same as wilderness (faster vital recovery)
-- `crate_signal` — same as wilderness (supply crate drops)
+- `aurora` — same as wilderness (reduced warmth drain) — already handled by existing `eventEffects.aurora` code
+- `cold_snap` — same as wilderness (increased warmth drain) — already handled
+- `thaw` — same as wilderness (faster vital recovery) — already handled
+- `crate_signal` — same as wilderness (supply crate drops) — already handled
 
 ## State additions
 
-Add to game state (with save migration defaults):
+Add to game state (with save migration defaults in `saveLoad.js`):
 
 ```js
-state.waveMultiplier = 1.0;       // modified by events, reset at dawn
-state.zombieSpeedMultiplier = 1.0; // modified by events/weather, reset at dawn
-state.buildingCostReduction = 0;   // modified by fortify event, reset next day
+state.waveMultiplier = 1.0;        // modified by events, reset at dawn
+state.zombieSpeedMultiplier = 1.0;  // modified by events, reset at dawn
+state.buildingCostReduction = 0;    // modified by fortify event, reset next day
 ```
 
-Migration defaults: all = their default values above.
+Migration defaults in `loadGame()`: all = their default values above.
 
 ## Where event effects reset
 
-Wave-related modifiers (`waveMultiplier`, `zombieSpeedMultiplier`) reset at dawn. Find the dawn transition in the wave spawner code (seed 03) and add resets there.
+Wave-related modifiers (`waveMultiplier`, `zombieSpeedMultiplier`) reset at dawn. Find the dawn transition in the wave management section of `useGameLoop.js` (the `if (!nightPhase && wasNightPhase)` block) and add resets there:
+```js
+s.waveMultiplier = 1.0;
+s.zombieSpeedMultiplier = 1.0;
+```
 
-`buildingCostReduction` resets at the start of the next day (when a new event rolls).
+`buildingCostReduction` resets at the start of the next day. Add `s.buildingCostReduction = 0;` at the top of the day-rollover block (where `s.day += 1` happens), before the new event is rolled.
 
 ## Acceptance criteria
 
@@ -159,8 +168,9 @@ Wave-related modifiers (`waveMultiplier`, `zombieSpeedMultiplier`) reset at dawn
 - [ ] `respite` event halves tonight's wave
 - [ ] `weapon_cache` gives a random weapon immediately
 - [ ] `ammo_cache` gives 5 scrap immediately
-- [ ] `survivor_radio` awards 50 XP
-- [ ] `fortify` reduces building wood cost by 2 for the day
+- [ ] `survivor_radio` awards 50 XP via `applyXp()` (NOT direct assignment)
+- [ ] `fortify` reduces building wood AND stone cost by 2 (min 1) for the day
+- [ ] Blizzard weather slows zombies by 25% independently of event modifiers
 - [ ] All modifiers reset at appropriate times (dawn or next day)
 - [ ] Day banner shows correct Outbreak event names
 - [ ] Save/load preserves event modifiers
@@ -178,8 +188,8 @@ Commit message: `feat: outbreak-specific daily events with horde modifiers`
 
 1. Read `src/data/events.js` — current table and roll function
 2. Read `useGameLoop.js` — find where events are rolled and effects applied
-3. Read `src/data/leveling.js` — understand how XP is awarded
-4. Find where building costs are validated (for the fortify discount)
+3. Read `src/data/leveling.js` — understand `applyXp` function signature
+4. Find where building costs are validated in `App.jsx` (for the fortify discount)
 5. Propose the event effect integration points
 6. Wait for go-ahead
 7. Implement: event table → roll function update → effect handlers → modifier resets → save migration
