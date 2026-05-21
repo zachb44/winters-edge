@@ -1,138 +1,98 @@
 # Tier B Item Effects
 
-**Phase 4 — Closing gaps. Run AFTER seed 09 (workbench crafting). The four Tier B items currently sit in inventory with no gameplay effect. This seed gives each one a real hook.**
-
 Copy this entire block into Claude Code as a single prompt.
 
 ---
 
-Four items are craftable at the workbench but do nothing when held: sharp knife, torch, lantern, and arrows. This seed adds a gameplay effect to each.
+Give gameplay effects to the four Tier B items that currently sit inert in inventory after crafting at the workbench. Each item gets a distinct mechanical hook.
 
-## Current state
+## Context
 
-In `src/data/recipes.js`, Tier B items are flagged with a comment: "currently sit in inventory with no game-loop effect." They craft and appear in inventory but have zero hooks in combat, movement, or the game loop.
+Seed 09 added 8 workbench recipes. The 4 Tier A items (hatchet, hunting_bow, dried_meat, fur_coat) already have effects. The 4 Tier B items (sharp_knife, torch, arrows, lantern) craft successfully and appear in inventory but do nothing. This seed gives each one a real gameplay effect.
 
-In `src/data/loot.js`, all four have `ITEM_INFO` entries (sharp_knife, torch, lantern, arrows). Lantern already drops from cabin loot tables.
+## Item effects
 
-In `src/data/combat.js`, `computePlayerAttackSpeed` checks for rifle, hunting_bow, and hatchet. `computePlayerRange` checks for bow/rifle.
+### Sharp Knife 🔪
 
-The game loop in `useGameLoop.js` processes warmth drain, vision, animal AI, zombie AI, and combat ticks.
+**Effect:** +3 bonus damage on all melee attacks (stacks with hatchet). Does NOT affect ranged attacks (bow/rifle).
 
-## Item 1: Sharp Knife — faster attack speed + skinning bonus
+**Implementation:**
+- In `src/logic/combat.js` (`computePlayerDamage`): after the existing weapon damage adds, check `state.inventory.sharp_knife > 0`. If yes, add +3 to `dmg`.
+- In `src/logic/zombies.js` (`computeZombieDamage`): same check, same +3.
+- Only applies when the attack is melee — if the player has a rifle or bow equipped (checked by `state.inventory.rifle > 0 || state.inventory.hunting_bow > 0`), the knife bonus does NOT apply. The knife is a sidearm for close combat.
+- The sharp_knife is consumed on use? **No.** It's a permanent passive buff while in inventory. It doesn't degrade.
 
-### Effect
-- **Attack speed:** Add sharp_knife to `WEAPON_ATTACK_MS` in `src/data/combat.js` with a value of `600` (fastest melee weapon). Update `computePlayerAttackSpeed` to check `state.inventory.sharp_knife > 0`.
-- **Skinning bonus:** In `src/logic/combat.js`, in the `applyAttack` function where animal kill drops are computed, if the player has `state.inventory.sharp_knife > 0`, add +1 raw_meat to the corpse's loot list. This stacks with Skin Master's +1 pelt (different item, both apply).
-- **Damage:** The knife is fast but weak. Do NOT add it to any damage bonus — it relies on attack speed, not hit power. The player's base damage (+ Power stat) applies as usual.
+### Torch 🔥
 
-### Recipe update
-Update the description in `src/data/recipes.js` for sharp_knife:
-```js
-desc: 'Fast melee weapon. +1 meat from animal kills.',
-```
+**Effect:** Wolves will not engage the player while a torch is held. Extends visible light radius by +2 tiles at night.
 
-## Item 2: Torch — expanded vision radius + wolf deterrent
+**Implementation — wolf deterrent:**
+- In `src/hooks/useGameLoop.js`, in the animal AI aggro section: when a wolf would normally enter its aggro/charge state toward the player, check `state.inventory.torch > 0`. If yes, the wolf treats the player as neutral (skips aggro). Wolves already adjacent do NOT disengage — the torch prevents new aggro, not ongoing combat.
+- Log on first wolf deterrence per game session: "🔥 The torch keeps the wolves at bay."
 
-### Effect
-- **Vision radius:** In `src/constants.js`, `VISION_RADIUS = 5`. When the player holds a torch (`state.inventory.torch > 0`), vision radius increases by 2 (to 7). 
-  - Implementation: in `visibilityAt` in `src/logic/visibility.js`, the radius is currently hardcoded as `VISION_RADIUS`. Pass a computed radius instead. Add a helper:
-    ```js
-    export function getEffectiveVisionRadius(state) {
-      return VISION_RADIUS + (state.inventory?.torch > 0 ? 2 : 0);
-    }
-    ```
-  - Update all `visibilityAt` callers to use `getEffectiveVisionRadius(state)` instead of the constant. If seed 14 has already changed the signature, adapt accordingly.
-  - **Night only:** The bonus applies at all times for simplicity. A future seed could restrict it to nighttime.
+**Implementation — light radius:**
+- In `src/logic/visibility.js` (`visibilityAt`): the current check uses `VISION_RADIUS`. Add a parameter or check: if `state.inventory.torch > 0` AND it's nighttime (time < 6 || time >= 18), use `VISION_RADIUS + 2` instead.
+- This means the torch extends vision at night but has no effect during the day (you already have full daylight vision).
+- The torch is NOT consumed. It's a permanent item. (Future seed could add fuel/durability.)
 
-- **Wolf deterrent:** Wolves within 3 tiles of the player will not initiate aggro if the player holds a torch. In `useGameLoop.js`, in the animal AI section where wolves decide to chase the player, add a check: if `state.inventory.torch > 0` and the wolf is within 3 tiles, skip the aggro trigger. Wolves already engaged in combat are NOT affected (the torch doesn't break an active fight).
+### Arrows ➳
 
-- **Durability (burn time):** The torch burns. Add `state.torchFuel` (default: 0, set to 100 when torch is first acquired or crafted). Each game-tick, if `state.inventory.torch > 0` and `state.torchFuel > 0`, decrement `state.torchFuel` by `TIME_SCALE * 0.5`. When `torchFuel` hits 0, set `state.inventory.torch = 0` and log `🔥 Your torch burned out.` The torch lasts roughly 2 in-game days at 1x speed.
-  - Crafting a new torch resets torchFuel to 100.
-  - **Save migration:** `state.torchFuel ??= state.inventory?.torch > 0 ? 100 : 0`
+**Effect:** Ammo for the hunting bow. Each bow attack consumes 1 arrow. No arrows = bow does not fire (falls back to melee).
 
-### Recipe update
-```js
-desc: '+2 vision radius. Deters wolves. Burns over ~2 days.',
-```
+**Implementation:**
+- Crafting the "arrows" recipe at the workbench produces `arrows: 5` (check seed 09's recipe — adjust if the recipe already specifies a quantity).
+- In `src/logic/combat.js` (`computePlayerDamage`): the existing bow damage check (`state.inventory.hunting_bow > 0`) must now ALSO check `state.inventory.arrows > 0`. If bow is present but arrows are 0, the bow damage bonus does not apply (player swings melee instead).
+- In `src/logic/zombies.js` (`computeZombieDamage`): same dual check.
+- **Arrow consumption:** In `combat.js` (`applyAttack`) and `zombies.js` (`applyZombieAttack`): after computing damage, if the attack used bow damage (bow present AND arrows > 0), decrement `state.inventory.arrows` by 1.
+- **Projectile check:** The projectile animation system (seed 13a) fires for ranged weapons. It should now also gate on arrows > 0 for the bow. If no arrows, no projectile spawns (melee swing instead).
+- **HUD indicator:** The existing resource ribbon or hotbar should show arrow count when arrows > 0. Check where the consumable belt renders in `BottomHud` — arrows could appear as a belt item or as a resource count.
+- **Rifle ammo is NOT added in this seed.** Rifle remains unlimited for now. A future seed can add bullets.
+- Log when arrows run out mid-combat: "➳ Out of arrows — switching to melee."
 
-## Item 3: Lantern — permanent vision radius boost
+### Lantern 🏮
 
-### Effect
-- **Vision radius:** When the player holds a lantern (`state.inventory.lantern > 0`), vision radius increases by 3 (to 8). This stacks with torch if both are held (radius 10), though that's unusual since both occupy the "light source" role.
-  - Add to the `getEffectiveVisionRadius` helper:
-    ```js
-    export function getEffectiveVisionRadius(state) {
-      let r = VISION_RADIUS;
-      if (state.inventory?.torch > 0) r += 2;
-      if (state.inventory?.lantern > 0) r += 3;
-      return r;
-    }
-    ```
-- **No burn time:** Lantern is permanent ("sealed flame — never burns out" per the existing description). This is its advantage over torch.
-- **No wolf deterrent:** Lantern provides light but not fire — wolves are not deterred.
+**Effect:** Permanent +3 vision radius (day and night). Stacks with torch's +2 night bonus.
 
-### Recipe update
-```js
-desc: '+3 vision radius. Never burns out.',
-```
+**Implementation:**
+- In `src/logic/visibility.js` (`visibilityAt`): check `state.inventory.lantern > 0`. If yes, use `VISION_RADIUS + 3`.
+- This stacks with the torch night bonus: at night with both items, effective radius = `VISION_RADIUS + 3 + 2 = VISION_RADIUS + 5`.
+- The lantern already exists as a loot drop from cabins and crates. This seed just adds the mechanical effect — the item already enters inventory.
 
-## Item 4: Arrows — ammo for hunting bow
+## Visibility function refactor
 
-### Effect
-- **Ammo consumption:** When the player attacks with a hunting bow and has arrows, consume 1 arrow per shot. In `src/logic/combat.js` or wherever the player's attack swing is processed:
-  - Check if the active weapon is the hunting bow (the weapon chosen for this swing — bow is used when `state.inventory.hunting_bow > 0` and the target is at range > 1).
-  - If bow attack AND `state.inventory.arrows > 0`: deduct 1 arrow. Attack proceeds normally.
-  - If bow attack AND `state.inventory.arrows === 0`: the bow still works but damage is halved (improvised shot with no arrow — keeps the game playable if you run out). Log once per combat engagement: `➳ Out of arrows — bow damage halved.`
-- **Rifle stays free for now.** Rifle ammo is a separate future system. This seed only affects the bow.
-- **Display:** The existing resource ribbon or HUD should show arrow count. Add arrows to the resource display in the top bar or HUD (wherever wood/stone/scrap/cloth are shown). Use the ➳ icon.
+The `visibilityAt` function in `src/logic/visibility.js` currently takes `(fog, px, py, x, y)` and uses the imported `VISION_RADIUS` constant. To support torch and lantern bonuses, it needs access to inventory and time-of-day.
 
-### Recipe update
-```js
-desc: 'Bow ammo. 1 per shot. No arrows = half bow damage.',
-```
+Options (pick the cleanest):
+- **Option A:** Add `state` as a parameter and compute effective radius inside the function.
+- **Option B:** Add an `effectiveRadius` parameter that the caller pre-computes.
+- **Option C:** Export a helper `getEffectiveVisionRadius(state)` and have the caller pass the result.
 
-## Integration points summary
+Option C is probably cleanest — one helper that all callers use, and `visibilityAt` just takes the radius as a number. Check how many places call `visibilityAt` before deciding.
 
-| File | Changes |
-|---|---|
-| `src/data/combat.js` | Add sharp_knife to WEAPON_ATTACK_MS (600). Update computePlayerAttackSpeed. |
-| `src/logic/combat.js` | Sharp knife +1 raw_meat on animal kill. Bow arrow consumption + half-damage fallback. |
-| `src/logic/visibility.js` | Add getEffectiveVisionRadius(state). Update visibilityAt to use computed radius. |
-| `src/hooks/useGameLoop.js` | Torch fuel burn tick. Wolf deterrent check in animal AI. Pass computed vision radius. |
-| `src/components/MapView.jsx` | Use getEffectiveVisionRadius for rendering. |
-| `src/components/GameUI.jsx` or HUD | Show arrow count in resource display. |
-| `src/data/recipes.js` | Update all four Tier B descriptions. |
-| `src/App.jsx` | Set torchFuel = 100 when crafting a torch. |
-| `src/logic/saveLoad.js` | Migrate torchFuel. |
+## Save migration
 
-## Acceptance criteria
+No new state fields needed — all items already exist in the inventory system. Arrow consumption is just decrementing an existing inventory count.
 
-- [ ] Sharp knife: attack speed 600ms (fastest melee). +1 raw_meat on animal kills.
-- [ ] Torch: +2 vision radius while held. Wolves within 3 tiles don't aggro. Burns out after ~2 in-game days. Log on burnout.
-- [ ] Lantern: +3 vision radius while held. Permanent (no fuel).
-- [ ] Torch + lantern stack vision bonus if both held.
-- [ ] Arrows: 1 consumed per bow shot. 0 arrows = half bow damage with a one-time log.
-- [ ] Arrow count visible in resource display.
-- [ ] Recipe descriptions updated to reflect effects.
-- [ ] Torch fuel persists across save/load.
-- [ ] `vite build` passes.
+However: if `state.inventory.arrows` is undefined on old saves, the checks should treat it as 0 (which they will via `state.inventory.arrows > 0` being falsy for undefined). Confirm this is safe.
 
 ## Constraints
 
-- Do NOT add a weapon-switching UI. The game auto-selects the best weapon (lowest attack speed). Sharp knife at 600ms will be auto-selected as melee when held.
-- Do NOT add rifle ammo in this seed. Rifle stays free. Arrow ammo for bow only.
-- Wolf deterrent only prevents NEW aggro. Does not break active combat.
-- Torch fuel ticks use TIME_SCALE for consistency with other drain rates.
-- Vision radius changes must propagate to ALL places that use VISION_RADIUS — check MapView rendering, fog update in game loop, and any tooltip/range calculations.
+- Don't break existing combat — weapons that currently work must still work identically when these items aren't present
+- Arrow consumption must work in BOTH animal combat (`combat.js`) and zombie combat (`zombies.js`)
+- Torch wolf deterrent only prevents NEW aggro, not ongoing combat
+- Vision radius changes must work with the existing fog-of-war permanent reveal system (fog tiles that have been explored stay explored)
+- Don't add item durability/fuel in this seed — all items are permanent
 
 ## Plan before executing
 
-1. Read `src/data/combat.js` — understand computePlayerAttackSpeed and WEAPON_ATTACK_MS
-2. Read `src/logic/combat.js` — find applyAttack and where kill drops are computed
-3. Read `src/logic/visibility.js` — understand visibilityAt signature (may have changed in seed 14)
-4. Read `useGameLoop.js` — find wolf aggro logic, player movement, fog update, drain ticks
-5. Read `src/components/MapView.jsx` — find vision radius usage in rendering
-6. Read `src/App.jsx` — find craft handler for torch fuel reset
-7. Propose integration points with line references
-8. Wait for go-ahead
-9. Implement in order: combat.js data → combat.js logic → visibility.js → useGameLoop.js → MapView → HUD → recipes → save migration
+1. Read `src/logic/combat.js` — understand `computePlayerDamage` and `applyAttack`
+2. Read `src/logic/zombies.js` — understand `computeZombieDamage` and `applyZombieAttack`
+3. Read `src/logic/visibility.js` — understand `visibilityAt` and its callers
+4. Read `src/hooks/useGameLoop.js` — find wolf aggro logic
+5. Read `src/components/MapView.jsx` — find where `visibilityAt` is called
+6. Read `src/data/recipes.js` — confirm arrow recipe quantity
+7. Propose plan, wait for go-ahead
+8. Implement: visibility refactor → knife damage → torch (wolf deterrent + vision) → arrows (consumption + gating) → lantern (vision) → logs
+9. Summarize and call out what to playtest
+
+Commit message: `feat: tier B item effects (knife dmg, torch deterrent, arrows ammo, lantern vision)`
