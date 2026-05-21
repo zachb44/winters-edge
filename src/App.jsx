@@ -22,6 +22,8 @@ import { MapView } from './components/MapView.jsx';
 import { LogPanel } from './components/LogPanel.jsx';
 import { AbilityHotbar } from './components/AbilityHotbar.jsx';
 import { Projectile } from './components/Projectile.jsx';
+import { BuildingActionMenu } from './components/BuildingActionMenu.jsx';
+import { applyBuildingAction } from './logic/buildings.js';
 import { BuildMenu } from './components/BuildMenu.jsx';
 import { InventoryMenu } from './components/InventoryMenu.jsx';
 import { SkillsMenu } from './components/SkillsMenu.jsx';
@@ -96,6 +98,7 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
     waveMultiplier: 1.0,
     zombieSpeedMultiplier: 1.0,
     buildingCostReduction: 0,
+    activeBuild: null,
   };
 };
 
@@ -139,6 +142,8 @@ export default function WintersEdge() {
   }, [projectiles.length]);
   const [levelUpBanner, setLevelUpBanner] = useState(null);
   const [statModalOpen, setStatModalOpen] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [pendingBuild, setPendingBuild] = useState(null);
   const damageIdRef = useRef(0);
   const [savedGameMeta, setSavedGameMeta] = useState(() => {
     const s = loadGame();
@@ -593,15 +598,29 @@ export default function WintersEdge() {
     onPlayerSwing, onAnimalSwing,
   });
 
-  const placeBuilding = (tx, ty) => {
-    if (!selectedBuild) return;
-    const cost = BUILDINGS[selectedBuild];
+  const computeBuildCost = (key) => {
+    const cost = BUILDINGS[key];
     const eventReduction = state.buildingCostReduction || 0;
     const coldForgedReduction = hasAbility(state, 'cold_forged') ? 1 : 0;
     const reduction = eventReduction + coldForgedReduction;
-    const woodCost = cost.wood > 0 ? Math.max(1, cost.wood - reduction) : 0;
-    const stoneCost = cost.stone > 0 ? Math.max(1, cost.stone - reduction) : 0;
-    if (state.inventory.wood < woodCost || state.inventory.stone < stoneCost || state.inventory.scrap < cost.scrap) {
+    return {
+      wood: cost.wood > 0 ? Math.max(1, cost.wood - reduction) : 0,
+      stone: cost.stone > 0 ? Math.max(1, cost.stone - reduction) : 0,
+      scrap: cost.scrap || 0,
+    };
+  };
+
+  const buildDurationMinutes = (key) => {
+    const cost = BUILDINGS[key];
+    const total = (cost.wood || 0) + (cost.stone || 0) + (cost.scrap || 0);
+    return Math.min(5, Math.max(1, Math.ceil(total / 4)));
+  };
+
+  const startActiveBuild = (key, tx, ty) => {
+    const adjusted = computeBuildCost(key);
+    if ((state.inventory.wood || 0) < adjusted.wood
+        || (state.inventory.stone || 0) < adjusted.stone
+        || (state.inventory.scrap || 0) < adjusted.scrap) {
       setState(s => addLog(s, 'Not enough resources.'));
       return;
     }
@@ -613,95 +632,84 @@ export default function WintersEdge() {
       setState(s => addLog(s, 'Something is already here.'));
       return;
     }
+    if (state.activeBuild) {
+      setState(s => addLog(s, 'Already building something — cancel with Esc first.'));
+      return;
+    }
     setState(prev => {
-      let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
-      s.inventory.wood -= woodCost;
-      s.inventory.stone -= stoneCost;
-      s.inventory.scrap -= cost.scrap;
-      const nb = { type: selectedBuild, x: tx, y: ty };
-      if (selectedBuild === 'campfire') nb.fuel = 10;
-      if (selectedBuild === 'trap') nb.caught = false;
-      const def = BUILDINGS[selectedBuild];
-      if (def.hp) { nb.hp = def.hp; nb.maxHp = def.maxHp; }
-      if (def.uses) { nb.usesLeft = def.uses; }
-      s.buildings = [...s.buildings, nb];
-      s = gainXp(s, 'crafting', 10);
-      s = applyXp(s, XP_REWARDS.buildStructure);
-      s = addLog(s, `✅ Built ${BUILDINGS[selectedBuild].name}`);
-      return s;
+      let s = { ...prev, inventory: { ...prev.inventory } };
+      s.inventory.wood -= adjusted.wood;
+      s.inventory.stone -= adjusted.stone;
+      s.inventory.scrap -= adjusted.scrap;
+      s.activeBuild = {
+        buildingType: key,
+        x: tx, y: ty,
+        startDay: s.day,
+        startTime: s.time,
+        durationMinutes: buildDurationMinutes(key),
+        spentCost: adjusted, // remembered for cancel refund
+      };
+      return addLog(s, `🔨 Started building ${BUILDINGS[key].name}...`);
     });
     setSelectedBuild(null);
   };
 
-  const interactBuilding = (b) => {
+  const placeBuilding = (tx, ty) => {
+    if (!selectedBuild) return;
+    const d = Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y);
+    if (d > 5) {
+      setState(s => addLog(s, 'Too far to build there.'));
+      return;
+    }
+    if (d > 1) {
+      // Walk first, then start the build when adjacent.
+      setPendingBuild({ type: selectedBuild, x: tx, y: ty });
+      setMoveTarget({ x: tx, y: ty });
+      return;
+    }
+    startActiveBuild(selectedBuild, tx, ty);
+  };
+
+  // When walking toward a pending build target, kick off the active build
+  // as soon as we get within 1 tile.
+  useEffect(() => {
+    if (!pendingBuild) return;
+    const d = Math.abs(pendingBuild.x - state.player.x) + Math.abs(pendingBuild.y - state.player.y);
+    if (d <= 1) {
+      const { type, x, y } = pendingBuild;
+      setPendingBuild(null);
+      setMoveTarget(null);
+      startActiveBuild(type, x, y);
+    }
+  }, [state.player.x, state.player.y, pendingBuild]);
+
+  // Resolve a pending traveler when the player approaches a lit campfire.
+  // This used to happen inside the old interactBuilding flow; now it runs
+  // implicitly when the campfire menu opens.
+  const resolvePendingTraveler = () => {
     setState(prev => {
+      if (!prev.pendingTraveler || prev.pendingTraveler.resolved) return prev;
       let s = { ...prev, inventory: { ...prev.inventory } };
-      if (b.type === 'campfire') {
-        if (s.pendingTraveler && !s.pendingTraveler.resolved) {
-          const r = Math.random();
-          if (r < 0.5) {
-            if (s.inventory.food > 0) {
-              s.inventory.food -= 1;
-              const gift = Math.random() < 0.5 ? 'dried_meat' : 'scrap';
-              const qty = 2 + Math.floor(Math.random() * 2);
-              s.inventory[gift] = (s.inventory[gift] || 0) + qty;
-              s = addLog(s, `👤 Shared a ration. They gave ${qty}× ${ITEM_INFO[gift].name}.`);
-            } else {
-              s = addLog(s, '👤 They were starving but you had no food. They wandered off.');
-            }
-          } else if (r < 0.8) {
-            const gifts = ['medkit','flare','cloth','dried_meat'];
-            const gift = gifts[Math.floor(Math.random() * gifts.length)];
-            s.inventory[gift] = (s.inventory[gift] || 0) + 1;
-            s = addLog(s, `👤 They thanked you and left a ${ITEM_INFO[gift].name} behind.`);
-          } else {
-            s = addLog(s, '👤 They warmed themselves, muttered about wolves, and slipped away.');
-          }
-          s.pendingTraveler = { resolved: true };
-        }
-        if (s.inventory.raw_meat > 0 && b.fuel > 0) {
-          s.inventory.raw_meat -= 1;
-          s.inventory.cooked_meat += 1;
-          s.buildings = s.buildings.map(x => x === b ? { ...x, fuel: Math.max(0, x.fuel - 0.5) } : x);
-          s = addLog(s, '🍳 Cooked raw meat');
-        } else if (s.inventory.wood >= 1) {
-          s.inventory.wood -= 1;
-          s.buildings = s.buildings.map(x => x === b ? { ...x, fuel: Math.min(20, x.fuel + 4), wentOutLogged: false } : x);
-          s = addLog(s, '🔥 Added wood to fire');
+      const r = Math.random();
+      if (r < 0.5) {
+        if (s.inventory.food > 0) {
+          s.inventory.food -= 1;
+          const gift = Math.random() < 0.5 ? 'dried_meat' : 'scrap';
+          const qty = 2 + Math.floor(Math.random() * 2);
+          s.inventory[gift] = (s.inventory[gift] || 0) + qty;
+          s = addLog(s, `👤 Shared a ration. They gave ${qty}× ${ITEM_INFO[gift].name}.`);
         } else {
-          s = addLog(s, 'No wood and no raw meat to cook.');
+          s = addLog(s, '👤 They were starving but you had no food. They wandered off.');
         }
-      } else if (b.type === 'tent') {
-        if (s.time > 19 || s.time < 6) {
-          s.player.warmth = Math.min(s.player.maxWarmth ?? 100, s.player.warmth + 30);
-          s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + 20);
-          s = addLog(s, '😴 You rest at the tent. (+30 warmth, +20 HP)');
-        } else s = addLog(s, 'Too early to sleep.');
-      } else if (b.type === 'trap') {
-        if (b.caught) {
-          s.inventory.raw_meat += 1;
-          s.buildings = s.buildings.map(x => x === b ? { ...x, caught: false } : x);
-          s = addLog(s, '🐰 Trap caught small game (+1 meat)');
-        } else s = addLog(s, 'Trap is empty.');
-      } else if (b.type === 'barricade' || b.type === 'reinforced_wall') {
-        const def = BUILDINGS[b.type];
-        if ((b.hp ?? def.hp) >= (b.maxHp ?? def.maxHp)) {
-          s = addLog(s, '🛡️ Already at full HP.');
-        } else {
-          const repairCost = b.type === 'barricade'
-            ? { wood: 2, stone: 0 }
-            : { wood: 1, stone: 2 };
-          if (s.inventory.wood < repairCost.wood || s.inventory.stone < repairCost.stone) {
-            s = addLog(s, 'Not enough resources to repair.');
-          } else {
-            s.inventory.wood -= repairCost.wood;
-            s.inventory.stone -= repairCost.stone;
-            const newHp = Math.min(b.maxHp ?? def.maxHp, (b.hp ?? def.hp) + 25);
-            s.buildings = s.buildings.map(x => x === b ? { ...x, hp: newHp } : x);
-            s = addLog(s, `🔨 Repaired ${def.name.toLowerCase()} (+25 HP)`);
-          }
-        }
+      } else if (r < 0.8) {
+        const gifts = ['medkit','flare','cloth','dried_meat'];
+        const gift = gifts[Math.floor(Math.random() * gifts.length)];
+        s.inventory[gift] = (s.inventory[gift] || 0) + 1;
+        s = addLog(s, `👤 They thanked you and left a ${ITEM_INFO[gift].name} behind.`);
+      } else {
+        s = addLog(s, '👤 They warmed themselves, muttered about wolves, and slipped away.');
       }
+      s.pendingTraveler = { resolved: true };
       return s;
     });
   };
@@ -845,7 +853,26 @@ export default function WintersEdge() {
       else if (e.key === 'Escape') {
         setMenu(null);
         setSelectedBuild(null);
+        setSelectedBuilding(null);
         setStatModalOpen(false);
+        // Cancel active build and refund.
+        setState(prev => {
+          if (!prev.activeBuild) return prev;
+          const ab = prev.activeBuild;
+          let s = { ...prev, inventory: { ...prev.inventory } };
+          if (ab.spentCost) {
+            s.inventory.wood = (s.inventory.wood || 0) + (ab.spentCost.wood || 0);
+            s.inventory.stone = (s.inventory.stone || 0) + (ab.spentCost.stone || 0);
+            s.inventory.scrap = (s.inventory.scrap || 0) + (ab.spentCost.scrap || 0);
+          }
+          s.activeBuild = null;
+          return addLog(s, '⛔ Build cancelled — resources refunded.');
+        });
+        // Cancel pendingBuild (walk-to-build) without refund (nothing spent yet).
+        setPendingBuild(pb => {
+          if (pb) setMoveTarget(null);
+          return null;
+        });
         setState(s => (s.combatTarget !== null || s.harvestTarget !== null)
           ? ({ ...s, combatTarget: null, combatTargetType: null, harvestTarget: null })
           : s);
@@ -897,7 +924,13 @@ export default function WintersEdge() {
     }
 
     const building = state.buildings.find(b => b.x === tx && b.y === ty);
-    if (building && d <= 1) { interactBuilding(building); return; }
+    if (building && d <= 1) {
+      if (building.type === 'campfire' && state.pendingTraveler && !state.pendingTraveler.resolved) {
+        resolvePendingTraveler();
+      }
+      setSelectedBuilding({ x: tx, y: ty, b: building });
+      return;
+    }
 
     if (tile === T.PLANE || tile === T.CABIN || tile === T.ARMORY || tile === T.BARRACKS) {
       interact(tx, ty);
@@ -945,6 +978,19 @@ export default function WintersEdge() {
             onTileClick={handleTileClick}
             damageNumbers={damageNumbers}
             projectiles={projectiles}
+            selectedBuilding={selectedBuilding}
+            onBuildingAction={(actionId) => {
+              const target = selectedBuilding?.b;
+              if (!target) return;
+              setState(s => {
+                // Re-resolve the building by position in case state has changed.
+                const live = s.buildings.find(b => b.x === target.x && b.y === target.y && b.type === target.type);
+                if (!live) return s;
+                return applyBuildingAction(s, live, actionId);
+              });
+              setSelectedBuilding(null);
+            }}
+            onCloseBuildingMenu={() => setSelectedBuilding(null)}
           />
 
           <div className="flex flex-col gap-1 w-72 flex-shrink-0 min-h-0">

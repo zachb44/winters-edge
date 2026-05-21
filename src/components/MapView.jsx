@@ -11,6 +11,8 @@ import { FloatingDamage } from './FloatingDamage.jsx';
 import { CombatOverlay } from './CombatOverlay.jsx';
 import { HarvestHpBars } from './HarvestHpBars.jsx';
 import { Projectile } from './Projectile.jsx';
+import { BuildingActionMenu } from './BuildingActionMenu.jsx';
+import { BuildProgress } from './BuildProgress.jsx';
 
 export function MapView({
   state, map, view, fog, mapScale,
@@ -19,6 +21,9 @@ export function MapView({
   onTileClick,
   damageNumbers,
   projectiles = [],
+  selectedBuilding = null,
+  onBuildingAction,
+  onCloseBuildingMenu,
 }) {
   const now = Date.now();
   const target = state.combatTarget != null
@@ -83,6 +88,14 @@ export function MapView({
             let filter = 'none';
             if (vis === 1) filter = 'brightness(0.45) saturate(0.5)';
             else if (depleted) filter = 'grayscale(0.7) opacity(0.55)';
+            // When Build mode is active, highlight tiles within the player's
+            // build range (Manhattan ≤ 5) on placeable surfaces (SNOW/ICE).
+            const inBuildRange = selectedBuild && vis > 0
+              && Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y) <= 5
+              && (tile === T.SNOW || tile === T.ICE);
+            const buildHighlight = inBuildRange
+              ? 'inset 0 0 0 1px rgba(74,222,128,0.5)'
+              : undefined;
             return (
               <div key={`${tx}-${ty}`}
                 onClick={() => vis > 0 && onTileClick(tx, ty)}
@@ -96,6 +109,7 @@ export function MapView({
                   filter,
                   borderRight: '1px solid rgba(0,0,0,0.05)',
                   borderBottom: '1px solid rgba(0,0,0,0.05)',
+                  boxShadow: buildHighlight,
                 }}>
                 {vis > 0 && data.emoji}
               </div>
@@ -362,6 +376,23 @@ export function MapView({
         <HarvestHpBars tileHp={state.tileHp} map={map} view={view} />
         <FloatingDamage items={damageNumbers} view={view} />
         {projectiles.map(p => <Projectile key={`proj-${p.id}`} p={p} view={view} />)}
+        {state.activeBuild && (
+          <BuildProgress
+            activeBuild={state.activeBuild}
+            currentDay={state.day}
+            currentTime={state.time}
+            view={view}
+          />
+        )}
+        {selectedBuilding && (
+          <BuildingActionMenu
+            state={state}
+            selectedBuilding={selectedBuilding}
+            view={view}
+            onAction={onBuildingAction}
+            onClose={onCloseBuildingMenu}
+          />
+        )}
         <PredatorAlert predator={nearbyPredator} />
 
         {tooltipReady && hover && (() => {

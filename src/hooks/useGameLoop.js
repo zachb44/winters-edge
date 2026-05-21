@@ -237,6 +237,29 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           });
         }
 
+        // Active build completion check.
+        if (s.activeBuild) {
+          const ab = s.activeBuild;
+          const elapsedHours = (s.day * 24 + s.time) - (ab.startDay * 24 + ab.startTime);
+          if (elapsedHours >= ab.durationMinutes / 60) {
+            const collision = s.buildings.some(bb => bb.x === ab.x && bb.y === ab.y);
+            if (!collision) {
+              const def = BUILDINGS[ab.buildingType];
+              const nb = { type: ab.buildingType, x: ab.x, y: ab.y };
+              if (ab.buildingType === 'campfire') nb.fuel = 10;
+              if (ab.buildingType === 'trap') nb.caught = false;
+              if (def?.hp) { nb.hp = def.hp; nb.maxHp = def.maxHp; }
+              if (def?.uses) { nb.usesLeft = def.uses; }
+              s.buildings = [...s.buildings, nb];
+              s = applyXp(s, XP_REWARDS.buildStructure);
+              s = addLog(s, `✅ Built ${def?.name || ab.buildingType}`);
+            } else {
+              s = addLog(s, '⚠️ Build cancelled — tile is occupied.');
+            }
+            s.activeBuild = null;
+          }
+        }
+
         // Corpse decay: drop corpses older than 4 in-game hours.
         if ((s.corpses || []).length > 0) {
           const nowHours = s.day * 24 + s.time;

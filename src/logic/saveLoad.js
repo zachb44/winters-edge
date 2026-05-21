@@ -84,6 +84,7 @@ export function loadGame() {
         waveMultiplier: state.waveMultiplier ?? 1.0,
         zombieSpeedMultiplier: state.zombieSpeedMultiplier ?? 1.0,
         buildingCostReduction: state.buildingCostReduction ?? 0,
+        activeBuild: state.activeBuild ?? null,
         player: {
           ...state.player,
           maxHp: state.player.maxHp ?? 100,
