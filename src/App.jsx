@@ -158,8 +158,8 @@ export default function WintersEdge() {
 
   useEffect(() => {
     const updateScale = () => {
-      // Top bar (~80px), log strip (~90px), bottom HUD (~160px).
-      const chromeHeight = 340;
+      // Top bar (dial + resource ribbon ~110px), log strip (~90px), bottom HUD (~180px).
+      const chromeHeight = 380;
       const pad = 24;
       const availH = window.innerHeight - chromeHeight - pad;
       const availW = window.innerWidth - pad * 2;
@@ -1008,7 +1008,7 @@ export default function WintersEdge() {
         @keyframes auroraShift { 0% { transform: translateX(-10%); opacity: 0.6; } 100% { transform: translateX(10%); opacity: 1; } }
       `}</style>
       <div className="flex flex-col h-full w-full mx-auto">
-        <GameUI state={state} setState={setState} onSaveAndQuit={saveAndQuit} onOpenStatModal={() => setStatModalOpen(true)} />
+        <GameUI state={state} />
 
         <div className="flex flex-1 min-h-0 p-1">
           <MapView
@@ -1028,9 +1028,12 @@ export default function WintersEdge() {
 
         <BottomHud
           state={state}
+          setState={setState}
           selectedBuilding={selectedBuilding}
           onConsume={eat}
           onActivateAbility={activateAbility}
+          onSaveAndQuit={saveAndQuit}
+          onOpenStatModal={() => setStatModalOpen(true)}
           onBuildingAction={(actionId) => {
             const target = selectedBuilding?.b;
             if (!target) return;

@@ -4,10 +4,13 @@ import { PlayerPanel } from './PlayerPanel.jsx';
 import { BuildingPanel } from './BuildingPanel.jsx';
 
 // Bottom HUD: HP orb + hunger (left) | center zone (player or building) |
-// Warmth orb + stamina (right). Compact icon strip on the far right exposes
-// Build / Inventory / Skills / Help overlays.
+// Warmth orb + stamina (right) | utility + menu strip (far right).
+//
+// The utility strip holds pause/speed/save (formerly in the top bar) plus
+// the overlay-menu buttons (Build, Inventory, Skills, Help).
 export function BottomHud({
   state,
+  setState,
   selectedBuilding,
   onConsume,
   onActivateAbility,
@@ -15,6 +18,8 @@ export function BottomHud({
   onCraft,
   onCloseBuildingPanel,
   onOpenMenu,
+  onSaveAndQuit,
+  onOpenStatModal,
 }) {
   const hp = state.player.hp;
   const hpMax = state.player.maxHp ?? 100;
@@ -48,6 +53,7 @@ export function BottomHud({
             state={state}
             onConsume={onConsume}
             onActivateAbility={onActivateAbility}
+            onOpenStatModal={onOpenStatModal}
           />
         )}
       </div>
@@ -65,8 +71,36 @@ export function BottomHud({
         <MiniBar label="⚡ Stamina" value={stamina} max={staminaMax} color="bg-green-500" width={110} />
       </div>
 
-      {/* Far right: menu strip */}
-      <div className="flex flex-col gap-1">
+      {/* Far right: utility + menu strip */}
+      <div className="flex flex-col gap-1 items-stretch">
+        <div className="flex gap-1">
+          <button
+            onClick={() => setState(s => ({ ...s, paused: !s.paused }))}
+            className="bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded px-2 py-1 text-[11px]"
+            title="Pause [Space]"
+          >
+            {state.paused ? '▶' : '⏸'}
+          </button>
+          {[1, 2, 3].map(sp => (
+            <button
+              key={sp}
+              onClick={() => setState(s => ({ ...s, gameSpeed: sp }))}
+              className={`px-2 py-1 rounded text-[11px] border ${state.gameSpeed === sp
+                ? 'bg-sky-600 border-sky-400'
+                : 'bg-slate-800 hover:bg-slate-700 border-slate-600'}`}
+            >
+              {sp}x
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onSaveAndQuit}
+          className="bg-emerald-700 hover:bg-emerald-600 border border-emerald-500 rounded px-2 py-1 text-[11px]"
+          title="Save & Quit"
+        >
+          💾 Save
+        </button>
+        <div className="h-px bg-slate-700 my-0.5" />
         <button
           onClick={() => onOpenMenu('build')}
           className="bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded px-2 py-1 text-[11px]"

@@ -1,13 +1,10 @@
 import React from 'react';
-import { PROFESSIONS } from '../data/professions.js';
-import { levelProgress } from '../data/leveling.js';
-import { LevelButton } from './LevelButton.jsx';
 import { DayNightDial } from './DayNightDial.jsx';
 
-// Slim top bar: identity + day/night + clock + weather + pause/speed + save.
-// Plus a thin raw-resource ribbon (wood/stone/scrap/cloth) — everything
-// edible/medical moved to the bottom-HUD belt or inventory overlay.
-export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
+// Slim top bar: just the day/night dial with its labels, plus a thin raw-
+// resource ribbon underneath. Identity, level-up button, pause/speed,
+// and save all live in the bottom HUD now.
+export function GameUI({ state }) {
   const timeStr = `${Math.floor(state.time).toString().padStart(2, '0')}:${Math.floor((state.time % 1) * 60).toString().padStart(2, '0')}`;
   const towerProgress = state.scenario === 'tower' ? {
     food: state.inventory.food + state.inventory.cooked_meat,
@@ -19,55 +16,31 @@ export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
 
   return (
     <>
-      <div className="bg-slate-800 px-2 py-1 flex flex-wrap items-center gap-2 text-xs border-b border-slate-700 flex-shrink-0">
-        <div className="font-bold text-sky-300 flex items-center gap-1">
-          ❄️ {PROFESSIONS[state.profession].emoji} {state.player.name}
-          <span className="text-amber-300 text-[10px] font-normal">(Lv {state.characterLevel || 1})</span>
-          <div className="w-12 h-0.5 bg-slate-700 rounded overflow-hidden ml-1">
-            <div className="h-full bg-amber-400" style={{ width: `${levelProgress(state).pct * 100}%` }}></div>
-          </div>
+      <div className="bg-slate-800 px-2 py-1 flex items-center justify-center gap-3 text-xs border-b border-slate-700 flex-shrink-0">
+        <DayNightDial time={state.time} />
+        <div className="flex flex-col leading-tight">
+          {state.mode === 'outbreak' && state.isNightPhase
+            ? (
+              <span className="text-red-300 font-semibold">
+                Night <span className="text-red-200 font-bold">{state.wave?.nightNumber || state.day}</span>{state.scenario === 'rescue' ? ' / 30' : ''}
+              </span>
+            )
+            : (
+              <span className="font-semibold">
+                Day <span className="text-white font-bold">{state.day}</span>{state.mode !== 'outbreak' && state.scenario === 'rescue' ? ' / 30' : ''}
+              </span>
+            )
+          }
+          <span className="text-[11px] text-slate-300">{timeStr}</span>
+          <span className="text-[11px] text-slate-300">
+            {state.weather === 'clear' && '☀️ Clear'}
+            {state.weather === 'snow' && '🌨️ Snowing'}
+            {state.weather === 'blizzard' && '🌬️ BLIZZARD'}
+          </span>
         </div>
-        <LevelButton pending={state.unspentStatPoints || 0} onClick={onOpenStatModal} />
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <DayNightDial time={state.time} />
-          <div className="flex flex-col leading-tight">
-            {state.mode === 'outbreak' && state.isNightPhase
-              ? (
-                <span className="text-red-300 font-semibold">
-                  Night <span className="text-red-200 font-bold">{state.wave?.nightNumber || state.day}</span>{state.scenario === 'rescue' ? ' / 30' : ''}
-                </span>
-              )
-              : (
-                <span className="font-semibold">
-                  Day <span className="text-white font-bold">{state.day}</span>{state.mode !== 'outbreak' && state.scenario === 'rescue' ? ' / 30' : ''}
-                </span>
-              )
-            }
-            <span className="text-[11px] text-slate-300">{timeStr}</span>
-            <span className="text-[11px] text-slate-300">
-              {state.weather === 'clear' && '☀️ Clear'}
-              {state.weather === 'snow' && '🌨️ Snowing'}
-              {state.weather === 'blizzard' && '🌬️ BLIZZARD'}
-            </span>
-          </div>
-        </div>
-        <button onClick={() => setState(s => ({ ...s, paused: !s.paused }))} className="bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
-          {state.paused ? '▶ Play' : '⏸ Pause'}
-        </button>
-        <div className="flex gap-1">
-          {[1,2,3].map(sp => (
-            <button key={sp} onClick={() => setState(s => ({...s, gameSpeed: sp}))}
-              className={`px-2 py-1 rounded text-xs ${state.gameSpeed===sp?'bg-sky-600':'bg-slate-700 hover:bg-slate-600'}`}>
-              {sp}x
-            </button>
-          ))}
-        </div>
-        <button onClick={onSaveAndQuit} className="bg-emerald-700 hover:bg-emerald-600 px-2 py-1 rounded text-xs">
-          💾 Save &amp; Quit
-        </button>
       </div>
 
-      <div className="bg-slate-800/80 px-2 py-0.5 flex flex-wrap gap-3 text-xs border-b border-slate-700 flex-shrink-0">
+      <div className="bg-slate-800/80 px-2 py-0.5 flex flex-wrap justify-center gap-4 text-xs border-b border-slate-700 flex-shrink-0">
         <span>🪵 {state.inventory.wood}</span>
         <span>🪨 {state.inventory.stone}</span>
         <span>🔧 {state.inventory.scrap}</span>
