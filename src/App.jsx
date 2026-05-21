@@ -23,7 +23,8 @@ import { MapView } from './components/MapView.jsx';
 import { LogPanel } from './components/LogPanel.jsx';
 import { AbilityHotbar } from './components/AbilityHotbar.jsx';
 import { Projectile } from './components/Projectile.jsx';
-import { BuildingActionMenu } from './components/BuildingActionMenu.jsx';
+import { BottomHud } from './components/BottomHud.jsx';
+import { BELT_SLOTS } from './components/HotbarBelt.jsx';
 import { applyBuildingAction } from './logic/buildings.js';
 import { BuildMenu } from './components/BuildMenu.jsx';
 import { InventoryMenu } from './components/InventoryMenu.jsx';
@@ -157,14 +158,14 @@ export default function WintersEdge() {
 
   useEffect(() => {
     const updateScale = () => {
-      const barsHeight = 150;
-      const sidebarWidth = 300;
+      // Top bar (~80px), log strip (~90px), bottom HUD (~160px).
+      const chromeHeight = 340;
       const pad = 24;
-      const availH = window.innerHeight - barsHeight - pad;
-      const availW = window.innerWidth - sidebarWidth - pad;
+      const availH = window.innerHeight - chromeHeight - pad;
+      const availW = window.innerWidth - pad * 2;
       const sH = availH / (VIEW_H * TILE);
       const sW = availW / (VIEW_W * TILE);
-      setMapScale(Math.min(1.8, Math.max(0.55, Math.min(sH, sW))));
+      setMapScale(Math.min(1.8, Math.max(0.5, Math.min(sH, sW))));
     };
     updateScale();
     window.addEventListener('resize', updateScale);
@@ -875,9 +876,11 @@ export default function WintersEdge() {
       else if (e.key === 'k' || e.key === 'K') setMenu(m => m === 'skills' ? null : 'skills');
       else if (e.key === 'h' || e.key === 'H') setMenu(m => m === 'help' ? null : 'help');
       else if (e.key === ' ') { e.preventDefault(); setState(s => ({ ...s, paused: !s.paused })); }
-      else if (e.key === '1') setState(s => ({ ...s, gameSpeed: 1 }));
-      else if (e.key === '2') setState(s => ({ ...s, gameSpeed: 2 }));
-      else if (e.key === '3') setState(s => ({ ...s, gameSpeed: 3 }));
+      else if (['1','2','3','4','5','6'].includes(e.key)) {
+        const idx = parseInt(e.key, 10) - 1;
+        const slot = BELT_SLOTS[idx];
+        if (slot) eat(slot.key);
+      }
       else if (e.key === 'Escape') {
         setMenu(null);
         setSelectedBuild(null);
@@ -913,6 +916,12 @@ export default function WintersEdge() {
   const handleTileClick = (tx, ty) => {
     if (selectedBuild) { placeBuilding(tx, ty); return; }
     const d = Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y);
+
+    // Any click that isn't on the currently-selected building deselects it.
+    // Re-selecting a building is handled below in the building branch.
+    if (selectedBuilding && (selectedBuilding.x !== tx || selectedBuilding.y !== ty)) {
+      setSelectedBuilding(null);
+    }
 
     if (state.pendingCarcass && state.pendingCarcass.x === tx && state.pendingCarcass.y === ty && d <= 1) {
       setState(prev => {
@@ -998,10 +1007,10 @@ export default function WintersEdge() {
         @keyframes smokeRise { 0% { transform: translateY(0) scale(1); opacity: 0.5; } 100% { transform: translateY(-20px) scale(1.5); opacity: 0; } }
         @keyframes auroraShift { 0% { transform: translateX(-10%); opacity: 0.6; } 100% { transform: translateX(10%); opacity: 1; } }
       `}</style>
-      <div className="flex flex-col h-full w-full max-w-7xl mx-auto">
+      <div className="flex flex-col h-full w-full mx-auto">
         <GameUI state={state} setState={setState} onSaveAndQuit={saveAndQuit} onOpenStatModal={() => setStatModalOpen(true)} />
 
-        <div className="flex flex-1 min-h-0 gap-2 p-1">
+        <div className="flex flex-1 min-h-0 p-1">
           <MapView
             state={state} map={map} view={view} fog={fog} mapScale={mapScale}
             snowflakes={snowflakes} hitFlashes={hitFlashes} footprints={footprints}
@@ -1012,35 +1021,29 @@ export default function WintersEdge() {
             damageNumbers={damageNumbers}
             projectiles={projectiles}
             selectedBuilding={selectedBuilding}
-            onBuildingAction={(actionId) => {
-              const target = selectedBuilding?.b;
-              if (!target) return;
-              setState(s => {
-                // Re-resolve the building by position in case state has changed.
-                const live = s.buildings.find(b => b.x === target.x && b.y === target.y && b.type === target.type);
-                if (!live) return s;
-                return applyBuildingAction(s, live, actionId);
-              });
-              setSelectedBuilding(null);
-            }}
-            onCloseBuildingMenu={() => setSelectedBuilding(null)}
           />
-
-          <div className="flex flex-col gap-1 w-72 flex-shrink-0 min-h-0">
-            <div className="bg-slate-800 p-1 grid grid-cols-2 gap-1 text-xs flex-shrink-0">
-              <button onClick={() => setMenu(menu === 'build' ? null : 'build')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[B] Build</button>
-              <button onClick={() => setMenu(menu === 'inventory' ? null : 'inventory')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[I] Inventory</button>
-              <button onClick={() => setMenu(menu === 'skills' ? null : 'skills')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[K] Skills</button>
-              <button onClick={() => setMenu(menu === 'help' ? null : 'help')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[H] Help</button>
-            </div>
-
-            <div className="bg-slate-800/60 p-1 flex-shrink-0">
-              <AbilityHotbar state={state} onActivate={activateAbility} />
-            </div>
-
-            <LogPanel log={state.log} />
-          </div>
         </div>
+
+        <LogPanel log={state.log} />
+
+        <BottomHud
+          state={state}
+          selectedBuilding={selectedBuilding}
+          onConsume={eat}
+          onActivateAbility={activateAbility}
+          onBuildingAction={(actionId) => {
+            const target = selectedBuilding?.b;
+            if (!target) return;
+            setState(s => {
+              const live = s.buildings.find(b => b.x === target.x && b.y === target.y && b.type === target.type);
+              if (!live) return s;
+              return applyBuildingAction(s, live, actionId);
+            });
+            setSelectedBuilding(null);
+          }}
+          onCloseBuildingPanel={() => setSelectedBuilding(null)}
+          onOpenMenu={(m) => setMenu(menu === m ? null : m)}
+        />
 
         {menu && (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setMenu(null)}>

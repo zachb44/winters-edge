@@ -1,9 +1,11 @@
 import React from 'react';
 import { PROFESSIONS } from '../data/professions.js';
-import { Vital } from './shared/Vital.jsx';
 import { levelProgress } from '../data/leveling.js';
 import { LevelButton } from './LevelButton.jsx';
 
+// Slim top bar: identity + day/night + clock + weather + pause/speed + save.
+// Plus a thin raw-resource ribbon (wood/stone/scrap/cloth) — everything
+// edible/medical moved to the bottom-HUD belt or inventory overlay.
 export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
   const isNight = state.time < 6 || state.time > 19;
   const timeStr = `${Math.floor(state.time).toString().padStart(2, '0')}:${Math.floor((state.time % 1) * 60).toString().padStart(2, '0')}`;
@@ -57,28 +59,11 @@ export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
         </button>
       </div>
 
-      <div className="bg-slate-800 px-2 py-1 flex flex-wrap gap-2 text-xs border-b border-slate-700 flex-shrink-0">
-        <Vital label="❤️ HP" value={state.player.hp} color="bg-red-500"
-               criticalLabel={state.player.hp < 30 ? '⚠️ INJURED' : null} />
-        <Vital label="🔥 Warmth" value={state.player.warmth} color="bg-orange-400"
-               warning={state.player.warmth < 35}
-               criticalLabel={state.player.warmth < 25 ? '⚠️ FREEZING' : null} />
-        <Vital label="🍖 Hunger" value={state.player.hunger} color="bg-yellow-600"
-               warning={state.player.hunger < 30}
-               criticalLabel={state.player.hunger < 20 ? '⚠️ STARVING' : null} />
-        <Vital label="⚡ Stamina" value={state.player.stamina} color="bg-green-500" />
-      </div>
-
-      <div className="bg-slate-800 px-2 py-1 flex flex-wrap gap-3 text-xs border-b border-slate-700 flex-shrink-0">
+      <div className="bg-slate-800/80 px-2 py-0.5 flex flex-wrap gap-3 text-xs border-b border-slate-700 flex-shrink-0">
         <span>🪵 {state.inventory.wood}</span>
         <span>🪨 {state.inventory.stone}</span>
         <span>🔧 {state.inventory.scrap}</span>
-        <span>🥫 {state.inventory.food}</span>
-        <span>🍖 {state.inventory.raw_meat}</span>
-        <span>🍗 {state.inventory.cooked_meat}</span>
-        <span>🟡 {state.inventory.fat}</span>
-        <span>🦊 {state.inventory.pelts}</span>
-        {state.inventory.medkit > 0 && <span>🏥 {state.inventory.medkit}</span>}
+        <span>🧵 {state.inventory.cloth || 0}</span>
       </div>
 
       {state.currentEvent && (

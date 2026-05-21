@@ -11,7 +11,6 @@ import { FloatingDamage } from './FloatingDamage.jsx';
 import { CombatOverlay } from './CombatOverlay.jsx';
 import { HarvestHpBars } from './HarvestHpBars.jsx';
 import { Projectile } from './Projectile.jsx';
-import { BuildingActionMenu } from './BuildingActionMenu.jsx';
 import { BuildProgress } from './BuildProgress.jsx';
 
 export function MapView({
@@ -22,8 +21,6 @@ export function MapView({
   damageNumbers,
   projectiles = [],
   selectedBuilding = null,
-  onBuildingAction,
-  onCloseBuildingMenu,
 }) {
   const now = Date.now();
   const target = state.combatTarget != null
@@ -382,15 +379,23 @@ export function MapView({
             view={view}
           />
         )}
-        {selectedBuilding && (
-          <BuildingActionMenu
-            state={state}
-            selectedBuilding={selectedBuilding}
-            view={view}
-            onAction={onBuildingAction}
-            onClose={onCloseBuildingMenu}
-          />
-        )}
+        {selectedBuilding && (() => {
+          const { x: sx, y: sy } = selectedBuilding;
+          if (sx < view.x || sx >= view.x + VIEW_W || sy < view.y || sy >= view.y + VIEW_H) return null;
+          return (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: (sx - view.x) * TILE,
+                top: (sy - view.y) * TILE,
+                width: TILE,
+                height: TILE,
+                boxShadow: 'inset 0 0 0 2px rgba(250,204,21,0.9), 0 0 8px rgba(250,204,21,0.5)',
+                borderRadius: 2,
+              }}
+            />
+          );
+        })()}
         <PredatorAlert predator={nearbyPredator} />
 
         {tooltipReady && hover && (() => {
