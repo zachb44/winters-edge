@@ -41,7 +41,10 @@ export function getMenuActions(b, state) {
     if ((state.inventory.raw_meat || 0) > 0 && (b.fuel || 0) > 0) ids.push('cook_meat');
     if ((b.fuel || 0) > 0) ids.push('rest_here');
   } else if (b.type === 'tent') {
-    if (state.time > 19 || state.time < 6) ids.push('sleep');
+    // Sleep skips through the night — only meaningful in Wilderness Mode.
+    // In Outbreak Mode the night IS the threat, so sleeping past it would
+    // defeat the purpose of building defenses and engaging the horde.
+    if (state.mode !== 'outbreak' && (state.time > 19 || state.time < 6)) ids.push('sleep');
   } else if (b.type === 'trap') {
     ids.push('check_trap');
   } else if (b.type === 'workbench') {
@@ -91,6 +94,7 @@ export function actionRestHere(state) {
 }
 
 export function actionSleep(state, b) {
+  if (state.mode === 'outbreak') return pushLog(state, '🧟 No time to sleep — the dead are coming.');
   if (!(state.time > 19 || state.time < 6)) return pushLog(state, 'Too early to sleep.');
   let s = { ...state, player: { ...state.player } };
   // Skip to 7:00 the next day-rollover. If we're past 19:00, advance to 7
