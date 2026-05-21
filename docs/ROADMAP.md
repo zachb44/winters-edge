@@ -6,6 +6,9 @@ The current state of Winter's Edge, what's planned next, and what's queued for f
 
 The game is **demo-ready**. Shippable single-player prototype with:
 
+> **Big jump on 2026-05-21:** Outbreak Mode gained horde-themed daily events, defensive structures with HP, profession abilities at lv 3/5/7, calmer predator AI, click-to-loot corpses, ranged projectile animations, in-HUD building action menus, walk-to-place + adjacency-gated build time. UI was overhauled to a D2-style bottom HUD with HP/Warmth orbs, a 24-segment animated day/night dial, and the workbench is now a crafting hub. Player movement uses A* pathfinding so you route around obstacles instead of stalling on them. The per-system details below predate these changes; see the completed-bundles table at the bottom for the per-commit map.
+
+
 ### Core gameplay
 - Top-down 2D map with click-to-move
 - Day/night cycle (~5 min per in-game day at 1x)
@@ -103,15 +106,7 @@ This is the critical path. Everything else waits until Outbreak Mode is playable
 
 6. **Map expansion to 120×90** — `06-map-expansion.md` — 4× the area. Add all 8 named base locations (Military Outpost, Hangar, Tree Crescent, Cave System, Frozen Lake Cabin, Boulder Maze, Hilltop, Crash Site). *Depends on: 05*
 
-### Priority 2 — HUD + UX overhaul (next)
-
-7. **Mission A — D2-style bottom HUD** — `07-mission-a-d2-hud.md` — Orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
-
-8. **Mission B — WC3 animated day/night dial** — `08-mission-b-clock-dial.md` — Circular SVG dial with filling segments and sun/moon morph. *Depends on: 07*
-
-9. **Mission C — Workbench crafting hub** — `09-mission-c-workbench-crafting.md` — Click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.). *Depends on: 07*
-
-### Priority 4 — Polish + expansion (medium-term)
+### Priority 2 — Polish + expansion (medium-term)
 
 - Zombie variants (brute, runner, screamer)
 - Ammo as tracked resource (rifle uses bullets, bow uses arrows)
@@ -144,6 +139,8 @@ This is the critical path. Everything else waits until Outbreak Mode is playable
 | Pivot Docs | May 2026 | PIVOT.md created, VISION.md and ROADMAP.md updated to reflect two-mode design (Wilderness + Outbreak) |
 | Seed Queue | May 2026 | 13 prompt seeds written and queued: 8 new (mode selection, shambler, wave spawner, vitals rebalance, military outpost, map expansion, outbreak events, defensive structures) + 5 renumbered (HUD, clock, workbench, profession abilities, interaction overhaul) |
 | Phase 2 — Gameplay depth | 2026-05-21 | Seeds 10–13 shipped in one session. Outbreak events (`22433a7`), defensive structures (`ad4dafb`), profession abilities (`574e833`), interaction overhaul part 1 — predator damage retune + corpses + projectiles (`90c1d7d`), interaction overhaul part 2 — building action menus + adjacency + build time (`8d990c0`). 3 abilities (Track, Stim Pack, Earth Sense) stubbed pending fog-reveal / movement-buff systems. Rest Here at campfires stubbed. Zombie corpses deferred per seed spec. |
+| Playtest pass | 2026-05-21 | Outbreak Sleep restriction (`5d84d1e`); A* pathfinding + no build distance cap + adjacency-gated build progress + WC3-style log panel (`8c7fb5a`). |
+| Phase 3 — HUD overhaul | 2026-05-21 | Seeds 07–09 shipped in one session. D2-style bottom HUD with HP/Warmth orbs, 6-slot belt, in-HUD BuildingPanel (`1fe9eb0`); animated 24-segment day/night dial in the top bar (`2f6f118`); workbench crafting menu with 8 recipes (`0f8a402`). Track / Stim Pack / Earth Sense still pending their underlying systems. |
 
 ---
 
