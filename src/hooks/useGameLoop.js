@@ -20,6 +20,7 @@ import { MODE_CONFIG } from '../data/modeConfig.js';
 import { ZOMBIE_TYPES, zombieTicksPerMove } from '../data/zombies.js';
 import { applyZombieAttack, getWaveSize, spawnSubWave, despawnAllZombies } from '../logic/zombies.js';
 import { SPAWN_ZONES } from '../data/spawnZones.js';
+import { hasAbility } from '../logic/abilities.js';
 
 // Main game tick. Runs every 100ms while gameStarted && !paused && !dead && !rescued.
 // All state transitions go through setState(prev => next) so the hook stays pure
@@ -199,6 +200,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         if (s.player.warmth > regenThreshold && s.player.hunger > 50 && s.player.hp > 0 && s.player.hp < 100) {
           let regenAmount = s.eventEffects.thaw ? 0.4 : 0.2;
           if (prof.mods.hpRegenBonus) regenAmount *= prof.mods.hpRegenBonus;
+          if (hasAbility(s, 'diagnose')) regenAmount *= 2;
           s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + regenAmount * TIME_SCALE);
         }
 
@@ -347,7 +349,10 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           if (a.type === 'boar' && !a.aggro) return a;
           if (now - (a.lastAttackMs || 0) < attackMs) return a;
           const baseDmg = a.type === 'wolf' ? 8 : a.type === 'boar' ? 12 : 20;
-          const dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
+          let dmgTaken = prof.mods.dmgReduction ? Math.floor(baseDmg * prof.mods.dmgReduction) : baseDmg;
+          if (hasAbility(s, 'hardy') && s.player.warmth < 30) dmgTaken = Math.floor(dmgTaken * 0.7);
+          if (hasAbility(s, 'iron_will') && s.player.hp < 30) dmgTaken = Math.floor(dmgTaken * 0.7);
+          dmgTaken = Math.max(1, dmgTaken);
           s.player.hp = Math.max(0, s.player.hp - dmgTaken);
           const msg = a.type === 'wolf' ? '🐺 A wolf attacks!' : a.type === 'boar' ? '🐗 A boar gores you!' : '🐻 THE BEAR MAULS YOU!';
           s = addLog(s, msg);
@@ -480,7 +485,10 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             const type = ZOMBIE_TYPES[z.type];
             if (!type) return z;
             if (now - (z.lastAttackMs || 0) < type.attackSpeed) return z;
-            const dmgTaken = prof.mods.dmgReduction ? Math.floor(type.damage * prof.mods.dmgReduction) : type.damage;
+            let dmgTaken = prof.mods.dmgReduction ? Math.floor(type.damage * prof.mods.dmgReduction) : type.damage;
+            if (hasAbility(s, 'hardy') && s.player.warmth < 30) dmgTaken = Math.floor(dmgTaken * 0.7);
+            if (hasAbility(s, 'iron_will') && s.player.hp < 30) dmgTaken = Math.floor(dmgTaken * 0.7);
+            dmgTaken = Math.max(1, dmgTaken);
             s.player.hp = Math.max(0, s.player.hp - dmgTaken);
             s = addLog(s, `🧟 A ${type.name.toLowerCase()} claws at you! (-${dmgTaken} HP)`);
             if (s.player.hp <= 0 && !s.deathCause) {

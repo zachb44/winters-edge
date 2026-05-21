@@ -4,6 +4,7 @@
 // / unspentStatPoints / statUpgrades to render.
 
 import { pushLog } from '../logic/log.js';
+import { getUnlockAtExactly } from './abilities.js';
 
 // XP awarded for in-world actions. The game-logic layer is responsible
 // for calling applyXp at the right moments — these constants are just
@@ -55,9 +56,12 @@ export function applyXp(state, amount) {
   let s = { ...state, characterXp: (state.characterXp || 0) + amount };
   let level = s.characterLevel || 1;
   let pointsGained = 0;
+  const unlocked = [];
   while (s.characterXp >= xpForNextLevel(level)) {
     level += 1;
     pointsGained += 1;
+    const ability = getUnlockAtExactly(s.profession, level);
+    if (ability) unlocked.push(ability);
   }
   if (pointsGained > 0) {
     s = {
@@ -66,6 +70,15 @@ export function applyXp(state, amount) {
       unspentStatPoints: (s.unspentStatPoints || 0) + pointsGained,
     };
     s = pushLog(s, `🎉 Level Up! You are now Level ${level}.`);
+    if (unlocked.length > 0) {
+      const existingAbilities = s.player?.abilities || [];
+      const newAbilities = [...existingAbilities];
+      for (const ab of unlocked) {
+        if (!newAbilities.includes(ab.id)) newAbilities.push(ab.id);
+        s = pushLog(s, `✨ Unlocked: ${ab.name}`);
+      }
+      s = { ...s, player: { ...s.player, abilities: newAbilities } };
+    }
   }
   return s;
 }

@@ -11,6 +11,8 @@ import { applyAttack } from './logic/combat.js';
 import { gainXp } from './logic/progression.js';
 import { pushLog } from './logic/log.js';
 import { applyXp, XP_REWARDS, STAT_UPGRADES, levelProgress } from './data/leveling.js';
+import { ABILITIES, getAbilityDef } from './data/abilities.js';
+import { hasAbility, isCooldownReady, setCooldown, setCharges, getCharges } from './logic/abilities.js';
 import { saveGame, loadGame, clearSave } from './logic/saveLoad.js';
 import { SPAWN_ZONES } from './data/spawnZones.js';
 import { SetupScreen } from './components/SetupScreen.jsx';
@@ -18,6 +20,7 @@ import { IntroOverlay } from './components/IntroOverlay.jsx';
 import { GameUI } from './components/GameUI.jsx';
 import { MapView } from './components/MapView.jsx';
 import { LogPanel } from './components/LogPanel.jsx';
+import { AbilityHotbar } from './components/AbilityHotbar.jsx';
 import { BuildMenu } from './components/BuildMenu.jsx';
 import { InventoryMenu } from './components/InventoryMenu.jsx';
 import { SkillsMenu } from './components/SkillsMenu.jsx';
@@ -47,6 +50,10 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
       maxHp: 100, maxWarmth: 100, maxHunger: 100, maxStamina: 100,
       lastAttackMs: 0, lungeUntil: 0,
       name: charName,
+      abilities: [],
+      abilityCooldowns: {},
+      abilityCharges: {},
+      nextAttackMult: 1,
     },
     profession,
     inventory: baseInv,
@@ -429,11 +436,14 @@ export default function WintersEdge() {
         const tableName = lootMeta.table;
         const label = lootMeta.label;
         let drops = rollFromTable(tableName);
+        const totalQty = (ds) => ds.reduce((sum, d) => sum + d.qty, 0);
         if (prof.mods.lootReroll) {
           const d2 = rollFromTable(tableName);
-          const t1 = drops.reduce((sum, d) => sum + d.qty, 0);
-          const t2 = d2.reduce((sum, d) => sum + d.qty, 0);
-          if (t2 > t1) drops = d2;
+          if (totalQty(d2) > totalQty(drops)) drops = d2;
+        }
+        if (hasAbility(s, 'lucky_find') && Math.random() < 0.15) {
+          const d3 = rollFromTable(tableName);
+          if (totalQty(d3) > totalQty(drops)) drops = d3;
         }
         if (drops.length === 0) {
           s = addLog(s, 'Nothing useful this time.');
@@ -459,7 +469,12 @@ export default function WintersEdge() {
   const lootCrate = (crate) => {
     setState(prev => {
       let s = { ...prev, inventory: { ...prev.inventory } };
-      const drops = rollFromTable('crate');
+      let drops = rollFromTable('crate');
+      if (hasAbility(s, 'lucky_find') && Math.random() < 0.15) {
+        const d2 = rollFromTable('crate');
+        const totalQty = (ds) => ds.reduce((sum, d) => sum + d.qty, 0);
+        if (totalQty(d2) > totalQty(drops)) drops = d2;
+      }
       if (drops.length === 0) {
         s.inventory.food += 2;
         s.inventory.scrap += 1;
@@ -526,7 +541,9 @@ export default function WintersEdge() {
   const placeBuilding = (tx, ty) => {
     if (!selectedBuild) return;
     const cost = BUILDINGS[selectedBuild];
-    const reduction = state.buildingCostReduction || 0;
+    const eventReduction = state.buildingCostReduction || 0;
+    const coldForgedReduction = hasAbility(state, 'cold_forged') ? 1 : 0;
+    const reduction = eventReduction + coldForgedReduction;
     const woodCost = cost.wood > 0 ? Math.max(1, cost.wood - reduction) : 0;
     const stoneCost = cost.stone > 0 ? Math.max(1, cost.stone - reduction) : 0;
     if (state.inventory.wood < woodCost || state.inventory.stone < stoneCost || state.inventory.scrap < cost.scrap) {
@@ -629,6 +646,85 @@ export default function WintersEdge() {
             s = addLog(s, `🔨 Repaired ${def.name.toLowerCase()} (+25 HP)`);
           }
         }
+      }
+      return s;
+    });
+  };
+
+  const activateAbility = (id) => {
+    setState(prev => {
+      const def = getAbilityDef(id);
+      if (!def || def.kind !== 'active') return prev;
+      if (!hasAbility(prev, id)) return prev;
+      if (!isCooldownReady(prev, id)) return prev;
+      if (def.charges && getCharges(prev, id) > 0) return prev;
+
+      let s = { ...prev, inventory: { ...prev.inventory }, player: { ...prev.player } };
+
+      // Deferred stubs — log + no cooldown.
+      if (def.stub) {
+        return addLog(s, `✨ ${def.name}: not yet implemented.`);
+      }
+
+      if (id === 'power_chop' || id === 'power_mine') {
+        s = setCharges(s, id, def.charges);
+        s = setCooldown(s, id, def.cooldownHours);
+        s = addLog(s, `${def.emoji} ${def.name} ready — ${def.charges} charges.`);
+      } else if (id === 'aimed_shot' || id === 'battle_cry') {
+        s = { ...s, player: { ...s.player, nextAttackMult: def.multiplier || 2 } };
+        s = setCooldown(s, id, def.cooldownHours);
+        s = addLog(s, `${def.emoji} ${def.name} — next attack empowered.`);
+      } else if (id === 'field_bandage') {
+        if ((s.inventory.cloth || 0) < 1) {
+          return addLog(s, 'No cloth to use Field Bandage.');
+        }
+        s.inventory.cloth -= 1;
+        s.player.hp = Math.min(s.player.maxHp ?? 100, s.player.hp + 20);
+        s = setCooldown(s, id, def.cooldownHours);
+        s = addLog(s, '🩹 Field Bandage (+20 HP)');
+      } else if (id === 'salvage') {
+        const order = ['rifle', 'hunting_bow', 'hatchet'];
+        const targetWeapon = order.find(w => (s.inventory[w] || 0) > 0);
+        if (!targetWeapon) {
+          return addLog(s, 'No weapon to salvage.');
+        }
+        // eslint-disable-next-line no-alert
+        const ok = typeof window !== 'undefined'
+          ? window.confirm(`Salvage 1 ${ITEM_INFO[targetWeapon]?.name || targetWeapon} for 2-4 scrap?`)
+          : true;
+        if (!ok) return prev;
+        s.inventory[targetWeapon] -= 1;
+        const scrapGained = 2 + Math.floor(Math.random() * 3);
+        s.inventory.scrap = (s.inventory.scrap || 0) + scrapGained;
+        s = addLog(s, `🔧 Salvaged ${ITEM_INFO[targetWeapon]?.name || targetWeapon} (+${scrapGained} scrap)`);
+        // No cooldown — Salvage is gated by having a weapon to break down.
+      } else if (id === 'jury_rig') {
+        // Find the nearest depleted lootable tile within the player's visible
+        // range. Restore one use to its lootCounts entry.
+        const lc = { ...(s.lootCounts || {}) };
+        const lootables = [T.PLANE, T.CABIN, T.ARMORY, T.BARRACKS];
+        let best = null;
+        for (let yy = 0; yy < map.length; yy++) {
+          for (let xx = 0; xx < (map[yy]?.length || 0); xx++) {
+            const tile = map[yy][xx];
+            if (!lootables.includes(tile)) continue;
+            const k = `${xx},${yy}`;
+            const remaining = k in lc ? lc[k] : LOOT_BUDGET[tile];
+            if (remaining >= LOOT_BUDGET[tile]) continue;
+            const dist = Math.abs(xx - s.player.x) + Math.abs(yy - s.player.y);
+            if (!best || dist < best.dist) best = { x: xx, y: yy, k, remaining, dist };
+          }
+        }
+        if (!best) {
+          return addLog(s, 'No depleted sites to repair.');
+        }
+        lc[best.k] = best.remaining + 1;
+        s.lootCounts = lc;
+        s = setCooldown(s, id, def.cooldownHours);
+        s = addLog(s, `🛠️ Jury-Rig restored 1 loot use at (${best.x}, ${best.y}).`);
+      } else {
+        // Passive (shouldn't reach via activate, but guard anyway)
+        return prev;
       }
       return s;
     });
@@ -798,6 +894,10 @@ export default function WintersEdge() {
               <button onClick={() => setMenu(menu === 'inventory' ? null : 'inventory')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[I] Inventory</button>
               <button onClick={() => setMenu(menu === 'skills' ? null : 'skills')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[K] Skills</button>
               <button onClick={() => setMenu(menu === 'help' ? null : 'help')} className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">[H] Help</button>
+            </div>
+
+            <div className="bg-slate-800/60 p-1 flex-shrink-0">
+              <AbilityHotbar state={state} onActivate={activateAbility} />
             </div>
 
             <LogPanel log={state.log} />

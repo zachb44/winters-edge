@@ -5,6 +5,7 @@ import { TILE_DATA } from '../data/tiles.js';
 import { SPAWN_ZONES } from '../data/spawnZones.js';
 import { pushLog } from './log.js';
 import { applyXp, powerDamageMultiplier } from '../data/leveling.js';
+import { hasAbility } from './abilities.js';
 
 let _nextZombieId = 1;
 export function newZombieId() { return _nextZombieId++; }
@@ -108,7 +109,7 @@ export function spawnZombie(type, x, y, day = 1) {
 // Player damage against a zombie. Mirrors computePlayerDamage but skips the
 // hunting-skill bonus (zombies aren't huntable wildlife). Weapon, combat
 // profession mods, and the Power stat still apply.
-export function computeZombieDamage(state) {
+export function computeZombieDamage(state, target) {
   const prof = PROFESSIONS[state.profession];
   let dmg = 8 + (state.equipment.hasKnife ? 4 : 0);
   if (prof.mods.combatBonus) dmg = Math.floor(dmg * prof.mods.combatBonus);
@@ -117,6 +118,11 @@ export function computeZombieDamage(state) {
   else if (state.inventory.hunting_bow > 0) dmg += 8;
   else if (state.inventory.hatchet > 0) dmg += 5;
   dmg = Math.floor(dmg * powerDamageMultiplier(state));
+  if (hasAbility(state, 'execute') && target && target.maxHp && target.hp < 0.25 * target.maxHp) {
+    dmg = dmg * 2;
+  }
+  const mult = state.player?.nextAttackMult || 1;
+  if (mult > 1) dmg = Math.floor(dmg * mult);
   return Math.max(1, dmg);
 }
 
@@ -126,7 +132,10 @@ export function applyZombieAttack(prev, zombieId) {
   if (!target || target.hp <= 0) return { state: prev, hit: null };
 
   let s = { ...prev, inventory: { ...prev.inventory } };
-  const dmg = computeZombieDamage(s);
+  const dmg = computeZombieDamage(s, target);
+  if ((s.player?.nextAttackMult || 1) > 1) {
+    s = { ...s, player: { ...s.player, nextAttackMult: 1 } };
+  }
   let lethal = false;
 
   const newZombies = s.zombies.map(z => {

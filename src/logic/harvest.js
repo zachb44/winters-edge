@@ -12,6 +12,7 @@ import { TILE_HP, STAMINA_PER_HARVEST_SWING, computeHarvestDamage } from '../dat
 import { pushLog } from './log.js';
 import { gainXp } from './progression.js';
 import { applyXp, XP_REWARDS } from '../data/leveling.js';
+import { getCharges, consumeCharge } from './abilities.js';
 
 export function applyHarvest(prev) {
   const target = prev.harvestTarget;
@@ -21,7 +22,9 @@ export function applyHarvest(prev) {
   const max = TILE_HP[target.tile];
   if (!max) return { state: prev, hit: null };
   const currentHp = tileHp[key] ?? max;
-  const dmg = computeHarvestDamage(prev, target.tile);
+  let dmg = computeHarvestDamage(prev, target.tile);
+  // Power Chop: +2 swing damage while a charge is active on a tree.
+  if (target.tile === T.TREE && getCharges(prev, 'power_chop') > 0) dmg += 2;
   const newHp = currentHp - dmg;
 
   let s = {
@@ -49,14 +52,22 @@ export function applyHarvest(prev) {
   if (target.tile === T.TREE) {
     const woodBonus = profMods.woodBonus || 1;
     const earlyBonus = s.day <= 3 ? 1 : 0;
-    const amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus) + earlyBonus;
+    let amount = Math.floor((2 + Math.floor(s.skills.foraging / 2)) * woodBonus) + earlyBonus;
+    if (getCharges(s, 'power_chop') > 0) {
+      amount = Math.floor(amount * 1.5);
+      s = consumeCharge(s, 'power_chop');
+    }
     s.inventory.wood += amount;
     s = gainXp(s, 'foraging', 5);
     s = applyXp(s, XP_REWARDS.chopTree);
     s = pushLog(s, `🪓 Chopped wood (+${amount})`);
     // Caller (useGameLoop) will swap the map tile to SNOW and add a regrowth entry.
   } else if (target.tile === T.ROCK) {
-    const stoneAmount = profMods.miningBonus ? 2 : 1;
+    let stoneAmount = profMods.miningBonus ? 2 : 1;
+    if (getCharges(s, 'power_mine') > 0) {
+      stoneAmount += 1;
+      s = consumeCharge(s, 'power_mine');
+    }
     s.inventory.stone += stoneAmount;
     s = applyXp(s, XP_REWARDS.mineRock);
     s = pushLog(s, `⛏️ +${stoneAmount} stone`);

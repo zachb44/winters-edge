@@ -1,5 +1,6 @@
 import { PROFESSIONS } from '../data/professions.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { getUnlocksAt } from '../data/abilities.js';
 import { resetZombieIds } from './zombies.js';
 
 export const SAVE_KEY = 'wintersedge.save.v1';
@@ -81,6 +82,15 @@ export function loadGame() {
           maxStamina: state.player.maxStamina ?? 100,
           lastAttackMs: state.player.lastAttackMs ?? 0,
           lungeUntil: state.player.lungeUntil ?? 0,
+          abilities: (() => {
+            const existing = Array.isArray(state.player.abilities) ? [...state.player.abilities] : [];
+            const shouldHave = getUnlocksAt(state.profession, state.characterLevel ?? 1);
+            for (const id of shouldHave) if (!existing.includes(id)) existing.push(id);
+            return existing;
+          })(),
+          abilityCooldowns: state.player.abilityCooldowns ?? {},
+          abilityCharges: state.player.abilityCharges ?? {},
+          nextAttackMult: state.player.nextAttackMult ?? 1,
         },
       },
     };

@@ -3,6 +3,7 @@ import { rollFromTable, ITEM_INFO } from '../data/loot.js';
 import { pushLog } from './log.js';
 import { gainXp } from './progression.js';
 import { applyXp, XP_REWARDS, powerDamageMultiplier } from '../data/leveling.js';
+import { hasAbility } from './abilities.js';
 
 // Compute outgoing player damage against `animal`. Pure.
 export function computePlayerDamage(state, animal) {
@@ -17,6 +18,13 @@ export function computePlayerDamage(state, animal) {
   else if (state.inventory.hunting_bow > 0) dmg += 8;
   else if (state.inventory.hatchet > 0) dmg += 5;
   dmg = Math.floor(dmg * powerDamageMultiplier(state));
+  // Execute: enemies below 25% HP take 2x damage.
+  if (hasAbility(state, 'execute') && animal.maxHp && animal.hp < 0.25 * animal.maxHp) {
+    dmg = dmg * 2;
+  }
+  // One-shot next-attack multiplier (Aimed Shot, Battle Cry).
+  const mult = state.player?.nextAttackMult || 1;
+  if (mult > 1) dmg = Math.floor(dmg * mult);
   return Math.max(1, dmg);
 }
 
@@ -29,6 +37,11 @@ export function applyAttack(prev, animalId) {
 
   let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
   const dmg = computePlayerDamage(s, target);
+  // Consume one-shot next-attack multiplier after damage was computed.
+  if ((s.player?.nextAttackMult || 1) > 1) {
+    s = { ...s, player: { ...s.player, nextAttackMult: 1 } };
+  }
+  const grantSkinMasterPelt = hasAbility(s, 'skin_master');
   let lethal = false;
 
   const newAnimals = s.animals.map(a => {
@@ -51,6 +64,10 @@ export function applyAttack(prev, animalId) {
       else if (a.type === 'deer') { s.inventory.raw_meat += 5; s.inventory.pelts += 1; s = pushLog(s, '🦌 Killed deer (+5 meat, +1 pelt)'); }
       else if (a.type === 'seal') { s.inventory.raw_meat += 3; s.inventory.fat += 2; s = pushLog(s, '🦭 Killed seal (+3 meat, +2 fat)'); }
       else if (a.type === 'raven') { s.inventory.raw_meat += 1; s = pushLog(s, '🦅 Killed raven (+1 meat)'); }
+      if (grantSkinMasterPelt && a.type !== 'raven' && a.type !== 'rabbit') {
+        s.inventory.pelts = (s.inventory.pelts || 0) + 1;
+        s = pushLog(s, '🦊 Skin Master: +1 pelt');
+      }
       s = gainXp(s, 'hunting', 15);
       s = applyXp(s, XP_REWARDS.killAnimal[a.type] || 0);
       return { ...a, hp: 0 };
