@@ -23,6 +23,8 @@ A thin top bar containing only:
 
 Remove from the top: food, meat, fat, pelts, medkit counts. Those move into the inventory panel.
 
+**Outbreak Mode top bar:** In Outbreak Mode during the night phase, the top bar should show "Night N / 30" instead of "Day N / 30", matching the current GameUI behavior in `src/components/GameUI.jsx`. Check the `state.mode === 'outbreak' && state.isNightPhase` conditional and preserve it in the new layout.
+
 ### Middle of screen
 
 The map view — make it as large as practical. Should be the dominant visual element. Currently it's 20×15 tiles at 32px; if there's room, push it to 24×18 tiles or similar to fill more space.
@@ -73,8 +75,26 @@ Keep the Build / Inventory / Skills / Help buttons accessible, but move them to 
 
 - Don't break any existing game logic. All mechanics (movement, combat, day/night, weather, events, scenarios, professions) should still work identically.
 - This is a UI refactor, not a gameplay change.
-- Preserve existing keyboard shortcuts (B/I/K/H/Space/1/2/3/Esc) where they don't conflict. The belt hotkeys 1-6 should override the previous "1/2/3 = game speed" — move speed controls to a different mechanism (Shift+1/2/3 or button strip).
+- Preserve existing keyboard shortcuts (B/I/K/H/Space/Esc). Speed controls (1x/2x/3x) are already button-only in the current UI — there are no keyboard shortcuts for game speed, so the belt hotkeys 1-6 won't conflict with anything.
 - Commit when complete with a clear message like `feat: D2-style bottom HUD with orbs and selectable buildings`
+
+## Compatibility note: seed 13 (Interaction Overhaul)
+
+The building selection center-zone pattern established here is the **canonical building interaction UI**. Seed 13's sub-feature #4 (building interaction menus) should add its per-building action buttons (Add Wood, Cook, Sleep, Demolish, etc.) into this center zone — NOT as a separate floating popup component. When seed 13 runs, it extends the center zone's building panel with richer actions rather than creating a parallel UI.
+
+## Acceptance criteria
+
+- [ ] Top bar is minimal: name, level, day/night, weather, pause/speed, resource ribbon
+- [ ] In Outbreak Mode during night phase, top bar shows "Night N / 30" instead of "Day N"
+- [ ] Map fills most of the screen
+- [ ] Bottom HUD has HP orb (left), center zone (player/building), Warmth orb (right)
+- [ ] Hunger bar below HP orb, Stamina bar below Warmth orb
+- [ ] Clicking a building shows its menu in center zone with yellow border on map
+- [ ] Clicking elsewhere deselects building
+- [ ] Belt hotkeys 1-6 consume items
+- [ ] Belt auto-fills with prioritized consumables
+- [ ] Build/Inventory/Skills/Help accessible via compact buttons opening overlay panels
+- [ ] All existing game logic unchanged
 
 ## Plan before executing
 
