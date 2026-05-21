@@ -90,21 +90,15 @@ The game is **demo-ready**. Shippable single-player prototype with:
 
 These are the next prompts that can be pasted into Claude Code. See `docs/prompts/queued/` for full prompt text.
 
-### Priority 1 — Outbreak Mode core (next 3-5 sessions)
+### Priority 1 — Batch A: close the gaps (next session)
 
-This is the critical path. Everything else waits until Outbreak Mode is playable.
+Tightly scoped seeds that finish off systems stubbed during Phases 2 and 3. These can run in any order or together. See `docs/prompts/queued/` for full prompt text.
 
-1. **Mode selection screen** — `01-mode-selection.md` — Update character creation to add Mode → Scenario two-step selection. Wilderness Mode uses existing systems unchanged. Outbreak Mode sets reduced hunger/warmth drain rates and enables zombie spawning.
+1. **Deferred abilities** — `14-deferred-abilities.md` — Implement Track, Stim Pack, and Earth Sense (currently stubbed). Builds the temporary fog-reveal and movement-speed-buff systems they need. *Depends on: seed 12.*
 
-2. **Basic zombie enemy (shambler)** — `02-shambler-zombie.md` — First zombie type. Slow, predictable, moderate HP. Spawns at map edges at sundown. Uses existing combat system (auto-attack engagement). Distinct from animals in appearance and behavior. *Depends on: 01*
+2. **Tier B item effects** — `15-tier-b-item-effects.md` — Sharp Knife, Torch, Arrows, and Lantern get real gameplay effects (combat bonus, vision/warmth, ammo). *Depends on: seeds 09 + 12.*
 
-3. **Wave system + night counter** — `03-wave-spawner.md` — Zombie count scales with night number. Night 1 = small group, Night 30 = horde. Day banner changes to "NIGHT N" format at sundown. Win condition becomes "Survive 30 nights" in Outbreak Mode. *Depends on: 01, 02*
-
-4. **Outbreak vitals rebalance** — `04-vitals-rebalance.md` — Wire mode-dependent hunger/warmth drain rates into the game loop (outbreak = 1/4 rate). *Depends on: 01*
-
-5. **Military outpost zone** — `05-military-outpost.md` — Add the outpost area to the map. Multiple buildings, sandbag walls, watchtower, armory. Near the crash site in Outbreak Mode. Justifies weapon/ammo abundance. *Depends on: 01*
-
-6. **Map expansion to 120×90** — `06-map-expansion.md` — 4× the area. Add all 8 named base locations (Military Outpost, Hangar, Tree Crescent, Cave System, Frozen Lake Cabin, Boulder Maze, Hilltop, Crash Site). *Depends on: 05*
+3. **Zombie corpses** — `16-zombie-corpses.md` — Convert zombie kills from auto-loot to the same clickable-corpse system animal kills use. *Depends on: seed 13a (corpse system).*
 
 ### Priority 2 — Polish + expansion (medium-term)
 
@@ -141,6 +135,7 @@ This is the critical path. Everything else waits until Outbreak Mode is playable
 | Phase 2 — Gameplay depth | 2026-05-21 | Seeds 10–13 shipped in one session. Outbreak events (`22433a7`), defensive structures (`ad4dafb`), profession abilities (`574e833`), interaction overhaul part 1 — predator damage retune + corpses + projectiles (`90c1d7d`), interaction overhaul part 2 — building action menus + adjacency + build time (`8d990c0`). 3 abilities (Track, Stim Pack, Earth Sense) stubbed pending fog-reveal / movement-buff systems. Rest Here at campfires stubbed. Zombie corpses deferred per seed spec. |
 | Playtest pass | 2026-05-21 | Outbreak Sleep restriction (`5d84d1e`); A* pathfinding + no build distance cap + adjacency-gated build progress + WC3-style log panel (`8c7fb5a`). |
 | Phase 3 — HUD overhaul | 2026-05-21 | Seeds 07–09 shipped in one session. D2-style bottom HUD with HP/Warmth orbs, 6-slot belt, in-HUD BuildingPanel (`1fe9eb0`); animated 24-segment day/night dial in the top bar (`2f6f118`); workbench crafting menu with 8 recipes (`0f8a402`). Track / Stim Pack / Earth Sense still pending their underlying systems. |
+| HUD reflow | 2026-05-21 | Identity strip + pause/speed/save buttons moved off the top bar into the bottom HUD. Top bar now only carries the day/night dial and the raw-resource ribbon. Six placeholder inventory slots added beside the consumables belt for future ground pickups (`f0aca13`). |
 
 ---
 
