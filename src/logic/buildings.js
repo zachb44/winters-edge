@@ -5,6 +5,8 @@
 // (cost, refund table) live on BUILDINGS in src/data/buildings.js.
 
 import { BUILDINGS } from '../data/buildings.js';
+import { ITEM_INFO } from '../data/loot.js';
+import { getRecipe } from '../data/recipes.js';
 import { pushLog } from './log.js';
 
 // Refund per building type. Pre-multiplied by HP% for destructible buildings.
@@ -48,7 +50,8 @@ export function getMenuActions(b, state) {
   } else if (b.type === 'trap') {
     ids.push('check_trap');
   } else if (b.type === 'workbench') {
-    ids.push('open_crafting');
+    // The workbench panel renders its own crafting recipe list — no
+    // generic action button needed beyond Demolish (added below).
   } else if (b.type === 'barricade' || b.type === 'reinforced_wall') {
     if (b.hp !== undefined && b.maxHp && b.hp < b.maxHp) ids.push('repair');
   }
@@ -62,7 +65,6 @@ export const ACTION_LABELS = {
   rest_here: { label: '🛌 Rest Here', desc: '(Not yet implemented)' },
   sleep: { label: '😴 Sleep Until Dawn', desc: '+30 warmth, full stamina' },
   check_trap: { label: '🪤 Check Trap', desc: 'Collect catch if any' },
-  open_crafting: { label: '🔨 Open Crafting', desc: 'Craft a Hatchet (3w/2s/1k)' },
   repair: { label: '🔨 Repair', desc: '+25 HP' },
   demolish: { label: '⛏️ Demolish', desc: 'Refund partial materials' },
 };
@@ -119,19 +121,25 @@ export function actionCheckTrap(state, b) {
   return pushLog(s, '🐰 Trap caught small game (+1 raw meat)');
 }
 
-export function actionCraftHatchet(state) {
-  const cost = { wood: 3, stone: 2, scrap: 1 };
-  if ((state.inventory.wood || 0) < cost.wood
-      || (state.inventory.stone || 0) < cost.stone
-      || (state.inventory.scrap || 0) < cost.scrap) {
-    return pushLog(state, 'Not enough materials for Hatchet (3w/2s/1k).');
+// Deducts a recipe's costs and adds its output to inventory. No-op if the
+// recipe is unknown or the player can't afford it (with a log line).
+export function applyCraft(state, recipeId) {
+  const recipe = getRecipe(recipeId);
+  if (!recipe) return state;
+  for (const [item, qty] of Object.entries(recipe.costs)) {
+    if ((state.inventory[item] || 0) < qty) {
+      return pushLog(state, `Not enough materials for ${recipe.name}.`);
+    }
   }
   let s = { ...state, inventory: { ...state.inventory } };
-  s.inventory.wood -= cost.wood;
-  s.inventory.stone -= cost.stone;
-  s.inventory.scrap -= cost.scrap;
-  s.inventory.hatchet = (s.inventory.hatchet || 0) + 1;
-  return pushLog(s, '🔨 Crafted a Hatchet.');
+  for (const [item, qty] of Object.entries(recipe.costs)) {
+    s.inventory[item] = (s.inventory[item] || 0) - qty;
+  }
+  s.inventory[recipe.output.item] = (s.inventory[recipe.output.item] || 0) + recipe.output.qty;
+  const info = ITEM_INFO[recipe.output.item];
+  const icon = info?.icon || recipe.icon;
+  const label = recipe.output.qty > 1 ? `${recipe.output.qty}× ${recipe.name}` : recipe.name;
+  return pushLog(s, `🔨 Crafted ${icon} ${label}.`);
 }
 
 export function actionRepair(state, b) {
@@ -176,7 +184,6 @@ export function applyBuildingAction(state, b, actionId) {
     case 'rest_here':      return actionRestHere(state);
     case 'sleep':          return actionSleep(state, b);
     case 'check_trap':     return actionCheckTrap(state, b);
-    case 'open_crafting':  return actionCraftHatchet(state);
     case 'repair':         return actionRepair(state, b);
     case 'demolish':       return actionDemolish(state, b);
     default:               return state;

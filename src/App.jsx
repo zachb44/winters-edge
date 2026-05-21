@@ -25,7 +25,7 @@ import { AbilityHotbar } from './components/AbilityHotbar.jsx';
 import { Projectile } from './components/Projectile.jsx';
 import { BottomHud } from './components/BottomHud.jsx';
 import { BELT_SLOTS } from './components/HotbarBelt.jsx';
-import { applyBuildingAction } from './logic/buildings.js';
+import { applyBuildingAction, applyCraft } from './logic/buildings.js';
 import { BuildMenu } from './components/BuildMenu.jsx';
 import { InventoryMenu } from './components/InventoryMenu.jsx';
 import { SkillsMenu } from './components/SkillsMenu.jsx';
@@ -1040,6 +1040,10 @@ export default function WintersEdge() {
               return applyBuildingAction(s, live, actionId);
             });
             setSelectedBuilding(null);
+          }}
+          onCraft={(recipeId) => {
+            setState(s => applyCraft(s, recipeId));
+            // Keep the workbench panel open so the player can craft in a row.
           }}
           onCloseBuildingPanel={() => setSelectedBuilding(null)}
           onOpenMenu={(m) => setMenu(menu === m ? null : m)}

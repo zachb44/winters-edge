@@ -64,6 +64,9 @@ export const ITEM_INFO = {
   fur_coat: { name: 'fur coat', icon: '🧥' },
   snowshoes: { name: 'snowshoes', icon: '👢' },
   map_fragment: { name: 'map fragment', icon: '🗺️' },
+  sharp_knife: { name: 'sharp knife', icon: '🔪' },
+  torch: { name: 'torch', icon: '🔥' },
+  arrows: { name: 'arrows', icon: '➳' },
 };
 
 export function rollLoot(entries) {

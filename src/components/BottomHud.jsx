@@ -12,6 +12,7 @@ export function BottomHud({
   onConsume,
   onActivateAbility,
   onBuildingAction,
+  onCraft,
   onCloseBuildingPanel,
   onOpenMenu,
 }) {
@@ -39,6 +40,7 @@ export function BottomHud({
             state={state}
             selectedBuilding={selectedBuilding}
             onAction={onBuildingAction}
+            onCraft={onCraft}
             onClose={onCloseBuildingPanel}
           />
         ) : (
