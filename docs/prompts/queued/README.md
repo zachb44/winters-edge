@@ -11,14 +11,6 @@ Seed prompts for Claude Code sessions. Each file is a self-contained task prompt
 
 ## Current queue
 
-### Phase 2 — Gameplay depth
-| # | File | Description | Dependencies |
-|---|---|---|---|
-| 10 | `10-outbreak-events.md` | Horde-themed daily events | 01, 03 |
-| 11 | `11-defensive-structures.md` | Barricades, walls, spike traps + building-blocks-movement fix | 02, 03 |
-| 12 | `12-profession-abilities.md` | 18 abilities across 6 professions | None |
-| 13 | `13-interaction-overhaul.md` | 5 UX improvements (lethality, corpses, menus) | Review vs pivot |
-
 ### Phase 3 — HUD + UX overhaul
 | # | File | Description | Dependencies |
 |---|---|---|---|
@@ -28,20 +20,14 @@ Seed prompts for Claude Code sessions. Each file is a self-contained task prompt
 
 ## Cross-seed dependency notes
 
-These aren't blockers but are worth knowing:
+Phase 2 (seeds 10–13) shipped on 2026-05-21. Notes about the remaining HUD seeds:
 
-- **Seeds 10 + 11 both heavily modify `useGameLoop.js`.** If running in the same session, watch for merge conflicts in the zombie movement/attack section. They're functionally independent but touch overlapping code.
-- **Seed 11 (defensive structures) benefits from seed 13 sub-feature #4 (building menus)** for the repair interaction. Seed 11 has a fallback click-to-repair if 13 hasn't shipped.
-- **Seed 13 sub-feature #4 (building menus) adapts to seed 07.** If 07 has shipped, menus go in the center HUD zone. If not, they appear as floating popups. The seed handles both cases.
-- **Seed 12 (profession abilities) has a soft dependency on seed 13 sub-feature #1** (predator damage rebalance). Damage reduction passives (Hardy, Iron Will) multiply against animal damage values — the feel changes depending on whether 13's rebalance has shipped.
+- **Seed 09 (workbench crafting) adapts to seed 07.** If 07 has shipped, the crafting UI lives in the center HUD zone. If not, it falls back to a floating modal. The seed handles both cases.
+- **Seed 13's building menus already exist as floating popups** (since 07 hadn't shipped when 13 ran). When 07 ships, the building action menu may want to migrate into the center HUD zone for consistency. Not a blocker.
 
 ## Running multiple seeds in one session
 
-Seeds within the same phase are designed to work together. You can often run 2-3 in a single Claude Code session:
-- **10 + 11** — outbreak events + defensive structures (functionally independent, but both touch useGameLoop.js — run 10 first, then 11)
-- **07 + 08 + 09** — all three HUD missions (08 and 09 depend on 07)
-
-Don't cross phases in a single session. Finish Phase 2 before starting Phase 3.
+- **07 + 08 + 09** — all three HUD missions can run together (08 and 09 depend on 07).
 
 ## Completed prompts
 

@@ -103,23 +103,13 @@ This is the critical path. Everything else waits until Outbreak Mode is playable
 
 6. **Map expansion to 120×90** — `06-map-expansion.md` — 4× the area. Add all 8 named base locations (Military Outpost, Hangar, Tree Crescent, Cave System, Frozen Lake Cabin, Boulder Maze, Hilltop, Crash Site). *Depends on: 05*
 
-### Priority 2 — Gameplay depth (next 3-6 sessions after P1)
+### Priority 2 — HUD + UX overhaul (next)
 
-7. **Outbreak events** — `10-outbreak-events.md` — Replace/supplement cold-themed events with horde-themed ones in Outbreak Mode (big horde tonight, fast zombies, screamer spotted, weapon cache, ammo cache). Keep weather events. *Depends on: 01, 03*
+7. **Mission A — D2-style bottom HUD** — `07-mission-a-d2-hud.md` — Orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
 
-8. **Defensive structures** — `11-defensive-structures.md` — Barricades, reinforced walls, spike traps. Zombies attack structures. Structures have HP and can be repaired. Cost wood/stone. *Depends on: 02, 03*
+8. **Mission B — WC3 animated day/night dial** — `08-mission-b-clock-dial.md` — Circular SVG dial with filling segments and sun/moon morph. *Depends on: 07*
 
-9. **Profession abilities** — `12-profession-abilities.md` — Active skills tied to class, unlocked at levels 3/5/7. 18 abilities total across 6 professions. *No dependencies*
-
-10. **Interaction overhaul** — `13-interaction-overhaul.md` — 5 connected improvements: reduce predator lethality, corpse looting, ranged projectile animations, building interaction menus, build-time + adjacency requirements. Review against pivot before running. *No strict dependencies, but review for mode-awareness*
-
-### Priority 3 — HUD + UX overhaul (after P2)
-
-11. **Mission A — D2-style bottom HUD** — `07-mission-a-d2-hud.md` — Orbs for HP/Warmth, belt for consumables, selectable buildings show menu in center HUD
-
-12. **Mission B — WC3 animated day/night dial** — `08-mission-b-clock-dial.md` — Circular SVG dial with filling segments and sun/moon morph. *Depends on: 07*
-
-13. **Mission C — Workbench crafting hub** — `09-mission-c-workbench-crafting.md` — Click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.). *Depends on: 07*
+9. **Mission C — Workbench crafting hub** — `09-mission-c-workbench-crafting.md` — Click workbench to open recipe menu (torch, hatchet, hunting bow, fur coat, dried meat, etc.). *Depends on: 07*
 
 ### Priority 4 — Polish + expansion (medium-term)
 
@@ -153,6 +143,7 @@ This is the critical path. Everything else waits until Outbreak Mode is playable
 | Bug Fix | May 2026 | Animal attack throttle — animals were attacking every 100ms tick instead of respecting attackSpeed. Split map assignment to fix stale-reference bug (commit 829095e) |
 | Pivot Docs | May 2026 | PIVOT.md created, VISION.md and ROADMAP.md updated to reflect two-mode design (Wilderness + Outbreak) |
 | Seed Queue | May 2026 | 13 prompt seeds written and queued: 8 new (mode selection, shambler, wave spawner, vitals rebalance, military outpost, map expansion, outbreak events, defensive structures) + 5 renumbered (HUD, clock, workbench, profession abilities, interaction overhaul) |
+| Phase 2 — Gameplay depth | 2026-05-21 | Seeds 10–13 shipped in one session. Outbreak events (`22433a7`), defensive structures (`ad4dafb`), profession abilities (`574e833`), interaction overhaul part 1 — predator damage retune + corpses + projectiles (`90c1d7d`), interaction overhaul part 2 — building action menus + adjacency + build time (`8d990c0`). 3 abilities (Track, Stim Pack, Earth Sense) stubbed pending fog-reveal / movement-buff systems. Rest Here at campfires stubbed. Zombie corpses deferred per seed spec. |
 
 ---
 
