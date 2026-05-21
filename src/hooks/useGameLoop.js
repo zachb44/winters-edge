@@ -47,9 +47,10 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
         if (s.time >= 24) {
           s.time = s.time - 24;
           s.day += 1;
+          s.buildingCostReduction = 0;
           s = addLog(s, `--- Day ${s.day} ---`);
           s = applyXp(s, XP_REWARDS.surviveDay);
-          const event = rollDailyEvent(s.day);
+          const event = rollDailyEvent(s.day, s.mode || 'wilderness');
           s.currentEvent = event;
           s.eventEffects = {};
           s = addLog(s, `📅 ${event.name}: ${event.desc}`);
@@ -99,6 +100,32 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             });
           } else if (event.id === 'lost_traveler') {
             s.pendingTraveler = { resolved: false };
+          } else if (event.id === 'big_horde') {
+            s.waveMultiplier = 1.5;
+          } else if (event.id === 'fast_zombies') {
+            s.zombieSpeedMultiplier = 1.5;
+          } else if (event.id === 'respite') {
+            s.waveMultiplier = 0.5;
+          } else if (event.id === 'screamer_spotted') {
+            // TODO: when screamer zombie type exists, guarantee one spawns in
+            // the wave instead of (or alongside) the size bump.
+            s.waveMultiplier = 1.25;
+          } else if (event.id === 'weapon_cache') {
+            s.inventory = { ...s.inventory };
+            if (Math.random() > 0.5) {
+              s.inventory.rifle = (s.inventory.rifle || 0) + 1;
+              s = addLog(s, '🔫 Weapon cache: +1 rifle');
+            } else {
+              s.inventory.hunting_bow = (s.inventory.hunting_bow || 0) + 1;
+              s = addLog(s, '🏹 Weapon cache: +1 hunting bow');
+            }
+          } else if (event.id === 'ammo_cache') {
+            s.inventory = { ...s.inventory, scrap: (s.inventory.scrap || 0) + 5 };
+            s = addLog(s, '🎯 Ammo cache: +5 scrap');
+          } else if (event.id === 'survivor_radio') {
+            s = applyXp(s, 50);
+          } else if (event.id === 'fortify') {
+            s.buildingCostReduction = 2;
           }
           if (s.day === 30 && s.scenario === 'rescue' && s.mode !== 'outbreak') {
             s.rescued = true;
@@ -466,7 +493,9 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             // Locked-in target zombie stays still (mirrors animal behavior on
             // the player's combat target).
             if (s.combatTargetType === 'zombie' && s.combatTarget === z.id) return z;
-            const cadence = zombieTicksPerMove(ZOMBIE_TYPES[z.type].moveSpeed);
+            let cadence = zombieTicksPerMove(ZOMBIE_TYPES[z.type].moveSpeed);
+            cadence = Math.max(1, Math.round(cadence / (s.zombieSpeedMultiplier || 1)));
+            if (s.weather === 'blizzard') cadence = Math.max(1, Math.round(cadence * 1.33));
             if (tick - (z.lastMoveTick || 0) < cadence) return z;
             const dx = s.player.x - z.x;
             const dy = s.player.y - z.y;
@@ -500,7 +529,7 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           // Sundown transition: start a new wave.
           if (nightPhase && !wasNightPhase) {
             const nightNumber = s.day;
-            const totalToSpawn = getWaveSize(nightNumber);
+            const totalToSpawn = Math.max(1, Math.round(getWaveSize(nightNumber) * (s.waveMultiplier || 1)));
             // Lock in the nearest 2 (nights 1-10) or 3 (nights 11+) spawn
             // zones at sundown so threat direction stays stable across
             // sub-waves even if the player moves at night.
@@ -553,6 +582,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
             s = despawnAllZombies(s);
             s = addLog(s, '☀️ Dawn breaks. The dead retreat... for now.');
             s.wave = { ...(s.wave || {}), active: false };
+            s.waveMultiplier = 1.0;
+            s.zombieSpeedMultiplier = 1.0;
             if (survivedNight >= 30 && s.scenario === 'rescue') {
               s.rescued = true;
               s = addLog(s, '🎉 You held the line for 30 nights. Extraction is here.');

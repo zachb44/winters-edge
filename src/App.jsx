@@ -84,6 +84,9 @@ const initialState = (mode = 'wilderness', scenario = 'rescue', startPos = { x: 
     characterLevel: 1,
     unspentStatPoints: 0,
     statUpgrades: { vitality: 0, insulation: 0, endurance: 0, power: 0 },
+    waveMultiplier: 1.0,
+    zombieSpeedMultiplier: 1.0,
+    buildingCostReduction: 0,
   };
 };
 
@@ -523,7 +526,10 @@ export default function WintersEdge() {
   const placeBuilding = (tx, ty) => {
     if (!selectedBuild) return;
     const cost = BUILDINGS[selectedBuild];
-    if (state.inventory.wood < cost.wood || state.inventory.stone < cost.stone || state.inventory.scrap < cost.scrap) {
+    const reduction = state.buildingCostReduction || 0;
+    const woodCost = cost.wood > 0 ? Math.max(1, cost.wood - reduction) : 0;
+    const stoneCost = cost.stone > 0 ? Math.max(1, cost.stone - reduction) : 0;
+    if (state.inventory.wood < woodCost || state.inventory.stone < stoneCost || state.inventory.scrap < cost.scrap) {
       setState(s => addLog(s, 'Not enough resources.'));
       return;
     }
@@ -537,8 +543,8 @@ export default function WintersEdge() {
     }
     setState(prev => {
       let s = { ...prev, inventory: { ...prev.inventory }, skills: { ...prev.skills } };
-      s.inventory.wood -= cost.wood;
-      s.inventory.stone -= cost.stone;
+      s.inventory.wood -= woodCost;
+      s.inventory.stone -= stoneCost;
       s.inventory.scrap -= cost.scrap;
       const nb = { type: selectedBuild, x: tx, y: ty };
       if (selectedBuild === 'campfire') nb.fuel = 10;

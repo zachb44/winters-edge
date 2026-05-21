@@ -58,6 +58,9 @@ export function loadGame() {
         characterLevel: state.characterLevel ?? 1,
         unspentStatPoints: state.unspentStatPoints ?? 0,
         statUpgrades: state.statUpgrades ?? { vitality: 0, insulation: 0, endurance: 0, power: 0 },
+        waveMultiplier: state.waveMultiplier ?? 1.0,
+        zombieSpeedMultiplier: state.zombieSpeedMultiplier ?? 1.0,
+        buildingCostReduction: state.buildingCostReduction ?? 0,
         player: {
           ...state.player,
           maxHp: state.player.maxHp ?? 100,
