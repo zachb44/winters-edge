@@ -2,12 +2,12 @@ import React from 'react';
 import { PROFESSIONS } from '../data/professions.js';
 import { levelProgress } from '../data/leveling.js';
 import { LevelButton } from './LevelButton.jsx';
+import { DayNightDial } from './DayNightDial.jsx';
 
 // Slim top bar: identity + day/night + clock + weather + pause/speed + save.
 // Plus a thin raw-resource ribbon (wood/stone/scrap/cloth) — everything
 // edible/medical moved to the bottom-HUD belt or inventory overlay.
 export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
-  const isNight = state.time < 6 || state.time > 19;
   const timeStr = `${Math.floor(state.time).toString().padStart(2, '0')}:${Math.floor((state.time % 1) * 60).toString().padStart(2, '0')}`;
   const towerProgress = state.scenario === 'tower' ? {
     food: state.inventory.food + state.inventory.cooked_meat,
@@ -28,21 +28,29 @@ export function GameUI({ state, setState, onSaveAndQuit, onOpenStatModal }) {
           </div>
         </div>
         <LevelButton pending={state.unspentStatPoints || 0} onClick={onOpenStatModal} />
-        {state.mode === 'outbreak' && state.isNightPhase
-          ? (
-            <div className="text-red-300">Night <span className="text-red-200 font-bold">{state.wave?.nightNumber || state.day}</span>{state.scenario === 'rescue' ? ' / 30' : ''}</div>
-          )
-          : (
-            <div>Day <span className="text-white font-bold">{state.day}</span>{state.mode !== 'outbreak' && state.scenario === 'rescue' ? '/30' : ''}</div>
-          )
-        }
-        <div>{timeStr} {isNight ? '🌙' : '☀️'}</div>
-        <div>
-          {state.weather === 'clear' && '☀️ Clear'}
-          {state.weather === 'snow' && '🌨️ Snowing'}
-          {state.weather === 'blizzard' && '🌬️ BLIZZARD'}
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <DayNightDial time={state.time} />
+          <div className="flex flex-col leading-tight">
+            {state.mode === 'outbreak' && state.isNightPhase
+              ? (
+                <span className="text-red-300 font-semibold">
+                  Night <span className="text-red-200 font-bold">{state.wave?.nightNumber || state.day}</span>{state.scenario === 'rescue' ? ' / 30' : ''}
+                </span>
+              )
+              : (
+                <span className="font-semibold">
+                  Day <span className="text-white font-bold">{state.day}</span>{state.mode !== 'outbreak' && state.scenario === 'rescue' ? ' / 30' : ''}
+                </span>
+              )
+            }
+            <span className="text-[11px] text-slate-300">{timeStr}</span>
+            <span className="text-[11px] text-slate-300">
+              {state.weather === 'clear' && '☀️ Clear'}
+              {state.weather === 'snow' && '🌨️ Snowing'}
+              {state.weather === 'blizzard' && '🌬️ BLIZZARD'}
+            </span>
+          </div>
         </div>
-        <div className="flex-1"></div>
         <button onClick={() => setState(s => ({ ...s, paused: !s.paused }))} className="bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">
           {state.paused ? '▶ Play' : '⏸ Pause'}
         </button>
