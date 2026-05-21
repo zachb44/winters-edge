@@ -88,13 +88,11 @@ export function MapView({
             let filter = 'none';
             if (vis === 1) filter = 'brightness(0.45) saturate(0.5)';
             else if (depleted) filter = 'grayscale(0.7) opacity(0.55)';
-            // When Build mode is active, highlight tiles within the player's
-            // build range (Manhattan ≤ 5) on placeable surfaces (SNOW/ICE).
-            const inBuildRange = selectedBuild && vis > 0
-              && Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y) <= 5
-              && (tile === T.SNOW || tile === T.ICE);
-            const buildHighlight = inBuildRange
-              ? 'inset 0 0 0 1px rgba(74,222,128,0.5)'
+            // When Build mode is active, faintly outline placeable tiles
+            // (SNOW/ICE) you can currently see.
+            const placeable = selectedBuild && vis > 0 && (tile === T.SNOW || tile === T.ICE);
+            const buildHighlight = placeable
+              ? 'inset 0 0 0 1px rgba(74,222,128,0.35)'
               : undefined;
             return (
               <div key={`${tx}-${ty}`}
@@ -379,8 +377,8 @@ export function MapView({
         {state.activeBuild && (
           <BuildProgress
             activeBuild={state.activeBuild}
-            currentDay={state.day}
-            currentTime={state.time}
+            playerX={state.player.x}
+            playerY={state.player.y}
             view={view}
           />
         )}

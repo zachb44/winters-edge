@@ -13,6 +13,7 @@ import { pushLog } from './logic/log.js';
 import { applyXp, XP_REWARDS, STAT_UPGRADES, levelProgress } from './data/leveling.js';
 import { ABILITIES, getAbilityDef } from './data/abilities.js';
 import { hasAbility, isCooldownReady, setCooldown, setCharges, getCharges } from './logic/abilities.js';
+import { findPath, findPathToAdjacent, buildBlockingKeysFromBuildings } from './logic/pathfinding.js';
 import { saveGame, loadGame, clearSave } from './logic/saveLoad.js';
 import { SPAWN_ZONES } from './data/spawnZones.js';
 import { SetupScreen } from './components/SetupScreen.jsx';
@@ -129,6 +130,7 @@ export default function WintersEdge() {
   const [damageNumbers, setDamageNumbers] = useState([]);
   const [projectiles, setProjectiles] = useState([]);
   const projectileIdRef = useRef(0);
+  const pathRef = useRef([]); // remaining steps for the current moveTarget
   const [, forceTickRender] = useState(0);
   useEffect(() => {
     if (projectiles.length === 0) return;
@@ -373,13 +375,26 @@ export default function WintersEdge() {
   }, [state.dead, state.rescued]);
 
 
+  // Recompute the path whenever moveTarget changes (or the map regenerates).
+  useEffect(() => {
+    if (!moveTarget) { pathRef.current = []; return; }
+    const blockingKeys = buildBlockingKeysFromBuildings(state.buildings, BUILDINGS);
+    let path = findPath(map, blockingKeys, state.player.x, state.player.y, moveTarget.x, moveTarget.y);
+    // If the exact tile isn't reachable (e.g., it's a tree/rock/building),
+    // route to the nearest adjacent walkable tile instead.
+    if (!path) {
+      path = findPathToAdjacent(map, blockingKeys, state.player.x, state.player.y, moveTarget.x, moveTarget.y);
+    }
+    pathRef.current = path || [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveTarget, map]);
+
   useEffect(() => {
     if (!moveTarget || !gameStarted || state.paused || state.dead) return;
     const moveInterval = setInterval(() => {
       setState(prev => {
         if (!moveTarget) return prev;
-        const tx = moveTarget.x, ty = moveTarget.y;
-        // If we're chasing a combat target, stop walking once we're in attack range.
+        // Stop chasing once we're in attack range of the combat target.
         if (prev.combatTarget !== null) {
           const tgt = prev.combatTargetType === 'zombie'
             ? prev.zombies.find(z => z.id === prev.combatTarget)
@@ -393,7 +408,7 @@ export default function WintersEdge() {
             }
           }
         }
-        // If we're walking to a harvest target, stop once adjacent.
+        // Stop walking to harvest target once adjacent.
         if (prev.harvestTarget) {
           const ht = prev.harvestTarget;
           const td = Math.abs(ht.x - prev.player.x) + Math.abs(ht.y - prev.player.y);
@@ -402,7 +417,7 @@ export default function WintersEdge() {
             return prev;
           }
         }
-        if (prev.player.x === tx && prev.player.y === ty) {
+        if (prev.player.x === moveTarget.x && prev.player.y === moveTarget.y) {
           setMoveTarget(null);
           return prev;
         }
@@ -410,19 +425,33 @@ export default function WintersEdge() {
           setMoveTarget(null);
           return addLog(prev, 'Too exhausted to move.');
         }
-        let nx = prev.player.x, ny = prev.player.y;
-        const dx = tx - nx, dy = ty - ny;
-        if (Math.abs(dx) > Math.abs(dy)) nx += Math.sign(dx);
-        else ny += Math.sign(dy);
-        if (map[ny] && map[ny][nx] !== undefined && TILE_DATA[map[ny][nx]].walkable) {
-          return {
-            ...prev,
-            player: { ...prev.player, x: nx, y: ny, stamina: Math.max(0, prev.player.stamina - 0.5) },
-          };
-        } else {
-          setMoveTarget(null);
-          return prev;
+
+        // Walk the next step on the cached A* path.
+        let step = pathRef.current[0];
+        const isBlocked = (x, y) => {
+          if (!map[y] || map[y][x] === undefined) return true;
+          if (!TILE_DATA[map[y][x]].walkable) return true;
+          return prev.buildings.some(b => b.x === x && b.y === y && BUILDINGS[b.type]?.walkable === false);
+        };
+        if (!step || isBlocked(step.x, step.y)) {
+          // Recompute once — something moved in front of us.
+          const blockingKeys = buildBlockingKeysFromBuildings(prev.buildings, BUILDINGS);
+          let path = findPath(map, blockingKeys, prev.player.x, prev.player.y, moveTarget.x, moveTarget.y);
+          if (!path) {
+            path = findPathToAdjacent(map, blockingKeys, prev.player.x, prev.player.y, moveTarget.x, moveTarget.y);
+          }
+          pathRef.current = path || [];
+          step = pathRef.current[0];
+          if (!step) {
+            setMoveTarget(null);
+            return prev;
+          }
         }
+        pathRef.current = pathRef.current.slice(1);
+        return {
+          ...prev,
+          player: { ...prev.player, x: step.x, y: step.y, stamina: Math.max(0, prev.player.stamina - 0.5) },
+        };
       });
     }, 200 / state.gameSpeed);
     return () => clearInterval(moveInterval);
@@ -647,6 +676,8 @@ export default function WintersEdge() {
         startDay: s.day,
         startTime: s.time,
         durationMinutes: buildDurationMinutes(key),
+        accumulatedHours: 0,
+        lastTickHours: s.day * 24 + s.time,
         spentCost: adjusted, // remembered for cancel refund
       };
       return addLog(s, `🔨 Started building ${BUILDINGS[key].name}...`);
@@ -657,12 +688,9 @@ export default function WintersEdge() {
   const placeBuilding = (tx, ty) => {
     if (!selectedBuild) return;
     const d = Math.abs(tx - state.player.x) + Math.abs(ty - state.player.y);
-    if (d > 5) {
-      setState(s => addLog(s, 'Too far to build there.'));
-      return;
-    }
     if (d > 1) {
-      // Walk first, then start the build when adjacent.
+      // Walk first, then start the build when adjacent. No distance cap —
+      // pathfinding routes around obstacles.
       setPendingBuild({ type: selectedBuild, x: tx, y: ty });
       setMoveTarget({ x: tx, y: ty });
       return;
@@ -937,6 +965,11 @@ export default function WintersEdge() {
       return;
     }
     if (tile !== undefined && TILE_DATA[tile].walkable) {
+      // Free-form click to move — cancel any pending walk-to-build that
+      // was destined for a different tile so we don't trigger it later.
+      if (pendingBuild && (pendingBuild.x !== tx || pendingBuild.y !== ty)) {
+        setPendingBuild(null);
+      }
       setMoveTarget({ x: tx, y: ty });
     }
   };

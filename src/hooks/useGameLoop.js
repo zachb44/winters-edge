@@ -237,11 +237,18 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
           });
         }
 
-        // Active build completion check.
+        // Active build: progress only accrues while player is within 1 tile
+        // of the build site. Walk away → progress freezes. Walk back → resumes.
         if (s.activeBuild) {
           const ab = s.activeBuild;
-          const elapsedHours = (s.day * 24 + s.time) - (ab.startDay * 24 + ab.startTime);
-          if (elapsedHours >= ab.durationMinutes / 60) {
+          const nowH = s.day * 24 + s.time;
+          const lastH = ab.lastTickHours ?? nowH;
+          const dt = Math.max(0, nowH - lastH);
+          const dist = Math.abs(s.player.x - ab.x) + Math.abs(s.player.y - ab.y);
+          const adjacent = dist <= 1;
+          const accumulated = (ab.accumulatedHours ?? 0) + (adjacent ? dt : 0);
+          const targetHours = ab.durationMinutes / 60;
+          if (accumulated >= targetHours) {
             const collision = s.buildings.some(bb => bb.x === ab.x && bb.y === ab.y);
             if (!collision) {
               const def = BUILDINGS[ab.buildingType];
@@ -257,6 +264,8 @@ export function useGameLoop({ gameStarted, state, setState, map, setMap, moveTar
               s = addLog(s, '⚠️ Build cancelled — tile is occupied.');
             }
             s.activeBuild = null;
+          } else {
+            s.activeBuild = { ...ab, accumulatedHours: accumulated, lastTickHours: nowH };
           }
         }
 
