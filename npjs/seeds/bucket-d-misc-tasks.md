@@ -24,12 +24,13 @@
 |---|---|---|---|
 | File NPJS LLC | Tommy → Uncle Ron | OPEN | Can't do business banking, bigger jobs, or look legit without it. Route through Uncle Ron (family CPA), not DIY. Low urgency for cash power-washing, high "will be forgotten" risk. |
 | General liability insurance | Tommy → Uncle Ron / agent | OPEN | Power washing someone's house with no GL policy = one cracked window from a bad day. Pair with the LLC conversation. **Bucket A flagged this as a live customer question — "are you insured?" comes up on quotes. Until it's real, Tommy needs an honest interim answer, not a false claim. Bucket C built the honest interim line (answer #12) — but that's a BRIDGE, not the fix. A customer asking this on a live quote raises the priority of actually FILING the policy.** |
-| Confirm tax % to withhold | Zach → Uncle Ron | OPEN | Bucket B builds the money habit; Ron sets the actual %. (Zach uses 20%.) **Bucket B reconfirmed this as a HARD dependency — the tax-envelope % can't be finalized for Tommy until Ron weighs in. Until then the TAXES envelope uses a conservative placeholder Tommy treats as "set aside, don't touch."** |
+| Confirm tax % to withhold | Zach → Uncle Ron | OPEN | Bucket B builds the money habit; Ron sets the actual %. (Zach uses 20%.) **Bucket B reconfirmed this as a HARD dependency — the tax-envelope % can't be finalized for Tommy until Ron weighs in. Until then the TAXES envelope uses a conservative placeholder Tommy treats as "set aside, don't touch." Rev 2 note: the tax cut now happens WEEKLY on the Sunday call (Zach prompts it live), not per-job at the truck — so the % is a single weekly number Zach states, easy to correct once Ron sets it.** |
 | Business banking (separate account) | Tommy | OPEN | The money funnel in Bucket B needs a business account to funnel INTO. Currently none. **Bucket B note: this is the near-term port target — the two-envelope funnel (MAIN + hidden TAXES) ports straight into a real account. Do it soon; cash-only carries its own risk.** |
 | Confirm Bobby's power washer works | Tommy | OPEN | The entire first service line depends on it. Test it. "It runs" = done. |
 | Verify network inventory actually exists | Tommy | OPEN | He said he already did the 10-min contact inventory. Verify there's a real list — "I already did that" is what gets said when it didn't happen. |
 | Finish Jerry's windows | Tommy | IN PROGRESS | 2 windows + 2 crawl-space doors left, after the storms pass. Existing cash work. |
-| Buy the Bucket B physical supplies (before job one) | Tommy | OPEN | The whole operating system runs on physical surfaces. Needs: a pack of index cards, a visor clip/caddy, 4 envelopes (MAIN, TAXES, RECEIPTS, DONE), and a marker to label them. Tiny cost (~$15-25). Without these, the money funnel and job-card lifecycle have no home. **Bucket C note: the visor cheat-sheet card is now where the quoting one-pager physically lives — print/clip `tommy-facing/quoting-skeleton-one-page.md` to the visor. The two systems share the same surface.** |
+| Buy the Bucket B physical supplies (before job one) | Tommy | OPEN | The whole operating system runs on physical surfaces. Needs: a pack of index cards, a visor clip/caddy, home envelopes (MAIN, TAXES, RECEIPTS, DONE) + ONE truck envelope (all field cash goes here), and a marker to label them. Tiny cost (~$15-25). Without these, the money funnel and job-card lifecycle have no home. **Bucket C note: the visor cheat-sheet card is now where the quoting one-pager physically lives — print/clip `tommy-facing/quoting-skeleton-one-page.md` to the visor. The two systems share the same surface.** |
+| **NEW (Bucket B Rev 2): Put the recurring Sunday call in ZACH's own push system** | Zach | OPEN | The Bucket B Rev 2 redesign concentrates the system's load-bearing dependency on ONE thing: Zach making the Sunday call every week. That call now carries the tax set-aside, the stuck-job sweep, AND accountability. If Zach goes quiet, taxes stop and stuck jobs stop getting caught. So the call must live where ZACH can't miss it (his deadline/transcript push system) — not rely on Zach's memory any more than Tommy's. This is the new single point of failure, by design; protect it. |
 
 ## Surfaced by build chats
 
@@ -59,14 +60,31 @@
 
 **From Bucket B (Operating Foundation), Jun 24 2026:**
 
-- **The Bucket B system runs entirely on physical surfaces** (truck visor + 4 envelopes), no app, no
-  spreadsheet. The one new buy-before-job-one task (index cards + envelopes + visor caddy + marker)
-  is added to the Open tasks table above so it doesn't get lost.
+- **The Bucket B system runs entirely on physical surfaces** (phone as lead inbox + truck visor + envelopes), no app, no
+  spreadsheet. The buy-before-job-one supplies task is in the Open tasks table above so it doesn't get lost.
 - **Tax % is a hard dependency on Uncle Ron** (see updated note on the "Confirm tax %" row above) —
   the money funnel is fully built but the TAXES envelope % is a placeholder until Ron sets it.
 - **Business banking is the port target** for the envelope funnel (see updated note on the banking row).
-- **The permanent visor cheat-sheet card** is where the Bucket C quoting skeleton will physically live
-  once C is built — noted so C knows its output has a home.
+- **The permanent visor cheat-sheet card** is where the Bucket C quoting skeleton physically lives.
+
+**From Bucket B Rev 2 (ADHD-robustness pass), Jun 24 2026:**
+
+- **Why Rev 2 happened:** Zach asked the harder question — not "is each piece low-maintenance?" (the
+  seed's 5 tests) but "does the system still work the week Tommy forgets it exists?" Three Rev 1 pieces
+  quietly relied on Tommy's in-the-moment discipline with no backstop. Rev 2 added a 6th test (a process
+  fails if its only safeguard is Tommy remembering in the moment) and fixed all three:
+  1. **Tax split moved off the truck.** Rev 1 had Tommy splitting cash 3 ways right after a job (worst
+     ADHD moment). Rev 2: ALL field cash → ONE truck envelope (single can't-fail motion); the tax cut
+     happens WEEKLY on the Sunday call with Zach prompting it live. Welds the forgettable task (tax) to
+     the unforgettable event (Zach's call).
+  2. **Leads moved into the phone.** Rev 1 made a card the moment "someone asked" — a lead that never got
+     carded vanished silently. Rev 2: leads live in the phone (texts/missed calls create themselves, stay
+     in view); a card is only born when Tommy QUOTES. No silent drop, fewer cards.
+  3. **Sunday-call prep deleted.** Rev 1 contradicted itself with a Friday prep step. Rev 2: zero prep —
+     all answers are glanceable live while Zach's on the phone.
+- **New residual risk, named, not hidden:** the system now leans on ZACH making the Sunday call weekly.
+  That's the new single point of failure (by design — better on the reliable person than on Tommy's
+  exhaustion). → spawned the new Open task above: put the Sunday call in Zach's own push system.
 
 **From Bucket C (Quoting Engine), Jun 24 2026:**
 
@@ -98,4 +116,4 @@
 
 ---
 
-*Last updated: Jun 24 2026 — Bucket A + B + C complete. A (research) + B (operating foundation) + C (quoting engine + Tommy one-pager) all shipped. All three core build chats done; the remaining open items are the homeless tasks above (LLC, GL insurance, banking, tax %, supplies, washer test).*
+*Last updated: Jun 24 2026 — Bucket A + B + C complete; B revised to Rev 2 (ADHD-robustness pass). A (research) + B (operating foundation, Rev 2) + C (quoting engine + Tommy one-pager) all shipped. All three core build chats done; the remaining open items are the homeless tasks above (LLC, GL insurance, banking, tax %, supplies, washer test, + put Zach's Sunday call in his own push system).*
