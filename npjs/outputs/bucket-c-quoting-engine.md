@@ -1,12 +1,12 @@
 # OUTPUT — Bucket C: The Quoting Engine
 
 **For:** NPJS LLC (Tommy / Thomas Bellar Jr.) — power washing, Columbia/Midlands SC
-**Built by:** Bucket C build chat · Jun 24 2026
+**Built by:** Bucket C build chat · Jun 24 2026 · *(net/gross + one-pager-split pass: Jun 24 2026)*
 **Built on:** `npjs/outputs/bucket-a-powerwashing-research.md` (real local pricing — Duck, Monster Pro, Shamrock + county data)
-**Tommy-facing version:** `npjs/tommy-facing/quoting-skeleton-one-page.md`
+**Tommy-facing versions:** `npjs/tommy-facing/quoting-skeleton-one-page.md` (the live GLANCE CARD) + `npjs/tommy-facing/quoting-reference-sheet.md` (the at-home REFERENCE SHEET)
 
 > **Why this exists:** Quoting is Tommy's #1 named gap and his #1 ask. He freezes on
-> curveball questions live and loses the job. He under-quotes to win work (~$60/hr when
+> curveball questions live and loses the job. He under-quotes to win work (~$60/hr target when
 > locals charge ~$120/hr) and ends up effectively working for ~$20/hr because he doesn't
 > factor how long a job actually takes. This engine does two jobs: **give him a skeleton
 > so he never goes blank**, and **protect him from himself with a hard floor.**
@@ -23,18 +23,27 @@
 
 ## 1. How to use this engine
 
-There are two documents:
+There are THREE documents now (the one-pager was split — see note):
 
 - **This file** is the full reference — the logic, the why, the complete answer bank.
-  Tommy does **not** read this on a job. Zach reads it; Tommy reads the one-pager.
-- **The one-pager** (`tommy-facing/quoting-skeleton-one-page.md`) is what Tommy actually
-  holds in the driveway. Built so he can find any single answer in under 5 seconds without
-  reading top-to-bottom.
+  Tommy does **not** read this on a job. Zach reads it.
+- **The glance card** (`tommy-facing/quoting-skeleton-one-page.md`) is what Tommy actually
+  holds in the driveway. The 5 steps, the rates, the floor, and the BIG 3 answers only.
+  Built so he can find any single answer in under 5 seconds without reading top-to-bottom.
+- **The reference sheet** (`tommy-facing/quoting-reference-sheet.md`) is what Tommy reads
+  AT HOME to get familiar — the full 16-question bank, the full floor math, the in-person-only
+  surfaces, the too-big test. Never used live; it's the get-familiar doc behind the card.
+
+> **Why the split (review fix):** the original single one-pager carried 6 modules including a
+> 16-row Q&A table. On the #1 freeze question ("how much?"), Tommy hit a 16-row table — the
+> exact under-pressure scanning that makes him freeze. The freeze happens live; the live tool
+> cannot contain the thing that causes the freeze. So the live card holds only the big 3
+> answers (restored to their own hierarchy), and the full bank moved to the home reference.
 
 The flow on a real job:
 
 1. **Walk up. Run the 5-step skeleton (§2).** Surface → measure → rate → adjustments → number.
-2. **If they throw a curveball, read the answer off the bank (§5).** Don't improvise. Read it.
+2. **If they throw a curveball, read the answer.** The big 3 are on the glance card. Don't improvise — read it.
 3. **Before you say the number out loud, check the floor (§4).** Below the floor = walk away or re-scope.
 4. **If the job feels too big for one person, run the §6 gut check** before you say yes.
 
@@ -122,7 +131,7 @@ the cheapest.
 
 > **The trap Bucket A named:** a $400 job and a $150 job can be "the same half-day of
 > Tommy's life." He must **price the big one as the big one, not as 'a wash.'** That single
-> habit is the difference between $60/hr and $20/hr.
+> habit is the difference between clearing his $60/hr target and slipping to $20/hr.
 
 ---
 
@@ -131,9 +140,22 @@ the cheapest.
 This is the most important part of the engine. Tommy wants to run cheap to win work. Fine —
 **but cheap has a bottom**, and below that bottom he's paying the customer to work.
 
-### What $60/hr actually has to cover
+### Target vs. floor — say these two numbers right, because they are NOT the same
 
-Tommy's "$60/hr" is not $60 in his pocket. Out of every job comes:
+- **$60/hr is the TARGET on the meter** — the sticker rate he's aiming to quote at. It is
+  **not take-home.** Gas, chemicals, and wear still come out of it.
+- **~$50/hr NET is the FLOOR** — what's actually left *after* gas + chemicals + wear, divided
+  by his real door-to-door hours. This is the real money.
+
+The trap is reading $60 as "what I make." He doesn't make $60 — he quotes at $60 and *nets*
+less after costs. The floor is set in NET terms on purpose, so the number that protects him is
+measured in real money, not sticker price. $60 on the meter normally clears the $50 net
+floor — but a big job he under-times can quote at $60 and still net under $50. That's why the
+floor is checked in net, every time.
+
+### What the meter rate ($60/hr) actually has to cover
+
+Tommy's "$60/hr" is not $60 in his pocket. Out of it comes:
 
 - **Chemicals** — SH + surfactant (real cost per job, more on heavy growth)
 - **Gas** — both the truck/car to get there AND the washer running
@@ -155,31 +177,34 @@ hour of my life, door to door."**
 > (Heavy-growth jobs eat more chemical — bump it.)
 >
 > **Step 3: Net ÷ hours = real hourly.**
-> (Quote − job costs) ÷ honest hours. **That** is what he actually made.
+> (Quote − job costs) ÷ honest hours. **That** is what he actually made — the NET number the
+> floor is measured against.
 
 ### THE FLOOR LINE (the walk-away rule)
 
 > **If the job nets less than ~$50/hr of his actual door-to-door time, STOP. Re-scope or walk.**
 >
-> $50/hr net is the floor. His $60/hr target is ABOVE the floor — good. The floor exists for
-> the moment he's tempted to say a low number to win a job: **a job that nets under $50/hr is
-> a job that's costing him, not paying him.**
+> **~$50/hr NET is the floor. His $60/hr is the TARGET on the meter — a sticker rate, not
+> take-home.** The target sits above the floor by design. The floor exists for the moment he's
+> tempted to say a low number to win a job: **a job that nets under $50/hr is a job that's
+> costing him, not paying him** — no matter what the meter rate looked like.
 
 **Worked examples (using Bucket A local numbers):**
 
 - **Standard house wash, 2,000 sf, light growth, one story.** Quote = **$375** (mid of
-  $300–$450). Time, door to door = ~3.5 hrs. Costs ~$30. Net = $345 ÷ 3.5 = **~$98/hr.**
+  $300–$450). Time, door to door = ~3.5 hrs. Costs ~$30. Net = $345 ÷ 3.5 = **~$98/hr net.**
   Well above floor. Say it confidently — this is a good job.
 - **Two-car driveway, oil stains, easy access.** Base $200 + $50 oil = **$250.** Time ~2 hrs.
-  Costs ~$25. Net = $225 ÷ 2 = **~$112/hr.** Above floor. Good.
+  Costs ~$25. Net = $225 ÷ 2 = **~$112/hr net.** Above floor. Good.
 - **The trap job:** big 2,500 sf two-story house, heavy growth, lots of landscaping to protect
   — and Tommy's tempted to say **$300** to win it. Real time door-to-door = ~6 hrs. Costs ~$45.
-  Net = $255 ÷ 6 = **~$42/hr. BELOW FLOOR.** This is the exact job that pays him $20–$40/hr if
-  he's not careful. Correct move: this is a **Large** job ($500–$800), two-story (+30–50%),
+  Net = $255 ÷ 6 = **~$42/hr net. BELOW FLOOR.** This is the exact job that pays him $20–$40/hr
+  if he's not careful. Correct move: this is a **Large** job ($500–$800), two-story (+30–50%),
   heavy growth (+20–40%). Re-quote at **$550–$650**, or don't take it.
 
-> **One-line version for the one-pager:** *"Below $50/hr for your real time — door to door —
-> means re-quote or walk. If you're not sure how long it'll take, you're about to under-quote."*
+> **One-line version for the glance card:** *"Below $50/hr NET for your real time — door to
+> door, after gas/chems/wear — means re-quote or walk. $60/hr is the target on the meter, not
+> take-home. Not sure how long it'll take? You're about to under-quote."*
 
 ---
 
@@ -189,10 +214,12 @@ All 16 curveball questions from Bucket A, each with a ready answer. **Tommy read
 does not improvise.** The goal isn't to be perfect, it's to **not go blank.** Short, honest,
 confident wins.
 
-Bucket A flagged **#1 (price), #9 (damage), #12 (insured)** as the highest-freeze items.
-Those are built first and tightest below.
+> **Where Tommy sees these:** the BIG 3 (#1 price, #9 damage, #12 insured) are on his live
+> glance card, in their own boxes. **All 16** live on the at-home reference sheet
+> (`tommy-facing/quoting-reference-sheet.md`) for him to get familiar with off the job. Bucket A
+> flagged the big 3 as the highest-freeze items — they're built first and tightest below.
 
-### The big three (memorize these cold)
+### The big three (on the glance card — memorize these cold)
 
 **1. "How much will it cost?"** *(the big freeze)*
 > "Depends on the size and surface — let me measure real quick and I'll give you a number
@@ -285,23 +312,31 @@ bring a hand" or "let me look first" beats a yes he regrets:**
 > me either bring a hand or take a real look and quote it right."* Brother-first reminder: it's
 > not weakness to size a job honestly. Saying yes to a job that breaks him is the actual risk.
 
+*(This gut check is condensed on the glance card and full on the reference sheet.)*
+
 ---
 
 ## 7. Notes for Zach (not Tommy-facing)
 
 - **The floor is the keystone.** Everything else here is anti-freeze; §4 is anti-broke. If
-  Tommy only internalizes one thing, it's "estimate time honestly, then check $50/hr net."
+  Tommy only internalizes one thing, it's "estimate time honestly, then check $50/hr NET —
+  $60 is the target on the meter, not take-home."
+- **One-pager was split (review fix).** The live tool is now `quoting-skeleton-one-page.md`
+  (glance card: 5 steps + rates + floor + big 3) and the full bank moved to
+  `quoting-reference-sheet.md` (at-home). The 16-row table is off the live card on purpose —
+  it was the thing causing the freeze it was supposed to prevent.
 - **Insurance answer (#12) is a bridge, not a fix.** The Bucket D GL task is the real
   resolution — flagged there as OPEN and tied to this exact customer question. Worth pushing.
 - **Phase 2 calculator:** §3 inputs (surface, sq ft, stories, growth, stains, access) → §3 math
   → §4 floor check is deliberately structured to drop into an HTML/spreadsheet tool. When that's
-  built, the calculator should output **both** the number AND the floor check, so the math leaves
-  Tommy's head entirely (the real fix for the live-freeze).
+  built, the calculator should output **both** the number AND the net floor check, so the math
+  leaves Tommy's head entirely (the real fix for the live-freeze).
 - **What this engine does NOT solve:** it can't make Tommy measure honestly or estimate time
-  honestly. It gives him the structure; the Sunday check-in (one-page plan) is where "did you
-  actually use the skeleton" gets caught.
+  honestly. It gives him the structure; the Sunday check-in (one-page plan) is where the human
+  nudge on "did you actually use the skeleton" lives — though note (Bucket B Rev 3) the Sunday
+  call is now relational only and nothing operational hangs on it.
 
 ---
 
 *Power washing only. Built on Bucket A's real local pricing — no fabricated or national-as-floor
-numbers. Source material for Tommy's one-pager, which is the thing he actually carries.*
+numbers. Source material for Tommy's glance card + reference sheet, which are what he actually uses.*
