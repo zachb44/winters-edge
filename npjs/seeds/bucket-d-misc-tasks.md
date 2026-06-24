@@ -24,12 +24,12 @@
 |---|---|---|---|
 | File NPJS LLC | Tommy → Uncle Ron | OPEN | Can't do business banking, bigger jobs, or look legit without it. Route through Uncle Ron (family CPA), not DIY. Low urgency for cash power-washing, high "will be forgotten" risk. |
 | General liability insurance | Tommy → Uncle Ron / agent | OPEN | Power washing someone's house with no GL policy = one cracked window from a bad day. Pair with the LLC conversation. **Bucket A flagged this as a live customer question — "are you insured?" comes up on quotes. Until it's real, Tommy needs an honest interim answer, not a false claim.** |
-| Confirm tax % to withhold | Zach → Uncle Ron | OPEN | Bucket B builds the money habit; Ron sets the actual %. (Zach uses 20%.) |
-| Truck / financing | Tommy + Zach | WAITING | After July 4th. $15K target / $20K ceiling, ~$300/mo cap. NOT a prerequisite to starting — jobs fund the down payment. Separate research if/when needed. |
-| Business banking (separate account) | Tommy | OPEN | The money funnel in Bucket B needs a business account to funnel INTO. Currently none. |
+| Confirm tax % to withhold | Zach → Uncle Ron | OPEN | Bucket B builds the money habit; Ron sets the actual %. (Zach uses 20%.) **Bucket B reconfirmed this as a HARD dependency — the tax-envelope % can't be finalized for Tommy until Ron weighs in. Until then the TAXES envelope uses a conservative placeholder Tommy treats as "set aside, don't touch."** |
+| Business banking (separate account) | Tommy | OPEN | The money funnel in Bucket B needs a business account to funnel INTO. Currently none. **Bucket B note: this is the near-term port target — the two-envelope funnel (MAIN + hidden TAXES) ports straight into a real account. Do it soon; cash-only carries its own risk.** |
 | Confirm Bobby's power washer works | Tommy | OPEN | The entire first service line depends on it. Test it. "It runs" = done. |
 | Verify network inventory actually exists | Tommy | OPEN | He said he already did the 10-min contact inventory. Verify there's a real list — "I already did that" is what gets said when it didn't happen. |
 | Finish Jerry's windows | Tommy | IN PROGRESS | 2 windows + 2 crawl-space doors left, after the storms pass. Existing cash work. |
+| Buy the Bucket B physical supplies (before job one) | Tommy | OPEN | The whole operating system runs on physical surfaces. Needs: a pack of index cards, a visor clip/caddy, 4 envelopes (MAIN, TAXES, RECEIPTS, DONE), and a marker to label them. Tiny cost (~$15-25). Without these, the money funnel and job-card lifecycle have no home. |
 
 ## Surfaced by build chats
 
@@ -56,6 +56,17 @@
   ($0.35/sq ft asphalt) but roofs require soft-wash-only technique, gear Tommy doesn't own, and carry
   real fall risk. Captured for Phase 2; the honest job-one customer answer is "I don't offer roofs yet."
 
+**From Bucket B (Operating Foundation), Jun 24 2026:**
+
+- **The Bucket B system runs entirely on physical surfaces** (truck visor + 4 envelopes), no app, no
+  spreadsheet. The one new buy-before-job-one task (index cards + envelopes + visor caddy + marker)
+  is added to the Open tasks table above so it doesn't get lost.
+- **Tax % is a hard dependency on Uncle Ron** (see updated note on the "Confirm tax %" row above) —
+  the money funnel is fully built but the TAXES envelope % is a placeholder until Ron sets it.
+- **Business banking is the port target** for the envelope funnel (see updated note on the banking row).
+- **The permanent visor cheat-sheet card** is where the Bucket C quoting skeleton will physically live
+  once C is built — noted so C knows its output has a home.
+
 ## Parked / Phase 2
 
 | Item | Notes |
@@ -65,7 +76,8 @@
 | Carpentry / decks | Phase 2+. Needs truck, power tools (circular saw, table saw, nail gun), usually 2 people. Explicitly not now. |
 | Paul as a hire | Tommy already imagines a crew. Don't let it pull focus until ONE service is consistently booked. |
 | Phase 2 power-washing equipment | Surfaced by Bucket A: dedicated soft-wash pump/tank, real downstream system, longer hoses, X-Jet, roof-cleaning rig. Buy when the money picks them, not job one. |
+| Jobber / job-tracking app | Bucket B: only when paper index cards become an actual bottleneck (many jobs in flight at once). Not before. Foundation first. |
 
 ---
 
-*Last updated: Jun 24 2026 — Bucket A complete; supplies + scope decisions surfaced. B/C not yet deployed.*
+*Last updated: Jun 24 2026 — Bucket A + B complete. B built the operating foundation (money funnel, day shape, card-based job lifecycle, Sunday check-in, physical tracking) + Tommy one-pager. C not yet deployed.*
