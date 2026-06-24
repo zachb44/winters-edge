@@ -1,6 +1,11 @@
 # NPJS LLC — One-Page Plan
 **No Problems Just Solutions** | Thomas Bellar Jr. | Built with Zach | Jun 12 2026
 
+> **Companion reading:** the 3-doc teaching set in `tommy-facing/` (`01_powerwashing_primer.md`,
+> `02_business_structure.md`, `03_quoting_guide.md`) explains the trade, how a business
+> runs, and how to quote. This plan is the roadmap; those teach the how. Quoting now lives
+> in `03_quoting_guide.md` (replaces the old "quoting skeleton" referenced below).
+
 ---
 
 ## WHY
@@ -29,7 +34,7 @@ guard. Fridays are for wrapping up and quoting next week, not starting new.
 ## FIRST 30 DAYS (do these — nothing else)
 1. **Confirm Bobby's power washer works.** Test it this week. Done = it runs.
 2. **Get one power-washing job booked and completed.** Driveway, deck, siding —
-   anything. Take a before/after photo. (Use Zach's quoting skeleton.)
+   anything. Take a before/after photo. (See `03_quoting_guide.md` for how to quote it.)
 3. **Finish Jerry's windows** (2 windows + 2 crawl-space doors) after the storms.
 4. **Run the same lead play every week:** church on Sunday + hand 5 cards to
    real people + text 3 past contacts. Not "look for leads." This exact action.
@@ -47,13 +52,11 @@ The truck does NOT come first. The jobs come first. Every job you book in the
 next 3 weeks is down-payment money AND proof to the lender you have income.
 Goal: walk onto the lot July 5 with ~$3K down, not $1K.
 
-## CHECK-IN CADENCE
-**Every Sunday, 10 minutes, text or call.** Three questions only:
-1. How many jobs did you book/complete this week?
-2. What's the cash number right now?
-3. What's the one thing stuck?
-
-That's it. No spreadsheets. No reports. Just the three numbers and the blocker.
+## STAYING IN TOUCH
+We'll check in regularly — nothing formal, just a call between brothers to see
+how the week went, what's working, and where you're stuck. No prep, no
+spreadsheet, no required schedule. When something's stuck, call me — that's
+what I'm here for.
 
 ---
 *Brother first. Advisor second. This plan is small on purpose so you actually do it.*
