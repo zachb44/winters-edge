@@ -1,3 +1,12 @@
+> # ⚠️ ARCHIVED — June 2026
+> **Superseded by `03_quoting_guide.md`** (and the trade primer `01`) in this folder.
+> This at-home reference sheet (the full 16-answer bank, full floor math, too-big test)
+> was distilled into the teaching-style quoting guide. The full answer bank lives on
+> here as the deepest reference if it's ever wanted, but the teaching set is what goes
+> to Tommy. Kept for history only — **do not send this to Tommy as-is.**
+
+---
+
 # 📖 QUOTING — REFERENCE SHEET (read at home, NOT on a job)
 
 **This is the get-familiar doc. Read it on the couch a few times so the answers are already in your head.**
