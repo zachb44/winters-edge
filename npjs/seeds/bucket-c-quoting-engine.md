@@ -3,9 +3,12 @@
 > **How to use this seed:** Paste into a fresh chat. First action: read the `npjs/`
 > folder in `zachb44/winters-edge` (README, one-page plan, AND the completed
 > `npjs/outputs/bucket-a-powerwashing-research.md`). **Do not launch this chat until
-> Bucket A is done** — without A's pricing data this chat will invent numbers, which
-> is the one thing it must never do. Drop the finished doc in `npjs/outputs/`, the
-> stripped version in `npjs/tommy-facing/`, update bucket-d.
+> Bucket A is done.** Drop the finished doc in `npjs/outputs/`, the stripped version
+> in `npjs/tommy-facing/`, update bucket-d.
+>
+> **If you cannot read the `npjs/` folder, or it appears incomplete or stale, STOP
+> and tell Zach — do not proceed on this seed alone. If `bucket-a-powerwashing-research.md`
+> is missing or unreadable, STOP — do not proceed.**
 
 ---
 
@@ -30,12 +33,23 @@ local contractors charge ~$120/hr. He UNDER-quotes and eats the loss, sometimes
 ending up effectively working for ~$20/hr because he didn't factor how long a job
 takes. The engine has to protect him from himself.
 
-## Prerequisite
+## Prerequisite — and a quality gate, not just a presence check
 
 This chat MUST have `npjs/outputs/bucket-a-powerwashing-research.md` available — it
-holds the real power washing pricing (per sq ft, per job type) and the curveball
-question list. Build the quoting logic on THAT data. If it's not in the repo yet,
-stop and tell me; don't fabricate pricing.
+holds the power washing pricing (per sq ft, per job type) and the curveball question
+list. Build the quoting logic on THAT data.
+
+**Before you build, check the QUALITY of A's pricing, not just that the file exists:**
+
+- A's pricing must be grounded in real **Columbia / Midlands-SC** data (A was required
+  to cite 2–3 actual local operators and label "Columbia vs. national" per surface).
+- **If A's pricing is missing, OR is generic national averages with no real local
+  grounding, OR A flagged that it couldn't find local data — STOP and flag to Zach.
+  Do NOT build Tommy's hourly floor on national averages.** The floor is the number
+  that protects him from working for $20/hr; building it on the wrong market is the
+  one failure this engine cannot ship with.
+
+If A's local pricing is solid, proceed.
 
 ## What to build
 
@@ -45,15 +59,16 @@ stop and tell me; don't fabricate pricing.
    removes as much live thinking as possible.
 
 2. **Pricing logic** — how to go from "this driveway is ~X sq ft" to a defensible
-   number, using Bucket A's data. Include the simple math, and the floor.
+   number, using Bucket A's REAL LOCAL data. Include the simple math, and the floor.
 
 3. **The if-they-ask-X-say-Y bank** — the common power washing curveball questions
    (from Bucket A's list) with ready answers. This is the anti-freeze tool. When the
-   customer throws the question that used to kill him, he reads the answer.
+   customer throws the question that used to kill him, he reads the answer. Cover the
+   full list A surfaced — this is the single most important live tool, so don't trim it.
 
 4. **His hourly-floor math** — what $60/hr actually has to cover (his time, the
    chemicals, gas, wear) so he stops accidentally working for $20/hr. Give him the
-   "below this number, walk away" line.
+   "below this number, walk away" line. Built on A's real local rates, not national.
 
 5. **The too-big-for-one-person test** — a quick gut check to recognize the job he
    can't do solo BEFORE he says yes. He raised this fear directly on the call.
@@ -63,8 +78,13 @@ stop and tell me; don't fabricate pricing.
 1. **`npjs/outputs/bucket-c-quoting-engine.md`** — the full engine: skeleton +
    curveball bank + pricing logic + floor math.
 2. **`npjs/tommy-facing/quoting-skeleton-one-page.md`** — the physically-usable
-   version. The thing he prints or pulls up on his phone on a job. Minimal, scannable,
-   built to be used live, not read once.
+   version. The thing he prints or pulls up on his phone on a job.
+
+   **Tommy usability bar (this is a pass/fail spec, not just a length cap):**
+   Built for a brain that freezes live and won't re-read. Test: Tommy can find any
+   single answer in under 5 seconds without reading top-to-bottom. Labels and headers
+   he scans, not paragraphs he reads. If he'd have to READ it to use it, it failed.
+   One page is the ceiling, but usable-live is the real bar.
 
 Then update bucket-d. Also note: a future quote-CALCULATOR tool (HTML or spreadsheet)
 is parked as a Phase 2 build on top of this logic — flag in the output that the logic

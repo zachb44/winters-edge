@@ -3,6 +3,9 @@
 > This one isn't a research chat. It's the running home for real-but-homeless tasks
 > so they don't vanish into the box-in-the-closet. Any chat working on NPJS updates
 > this file. A fresh CMD-style chat reads it to see open threads at a glance.
+>
+> **If you cannot read the `npjs/` folder, or it appears incomplete or stale, STOP
+> and tell Zach — do not proceed on this seed alone.**
 
 ---
 
@@ -45,4 +48,4 @@
 
 ---
 
-*Last updated: Jun 12 2026 — buckets drafted, none deployed*
+*Last updated: Jun 24 2026 — seeds steelmanned + revised, none deployed*
