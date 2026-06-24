@@ -3,15 +3,23 @@
 
 ---
 
-## 💵 THE MONEY (one rule each)
+## 💵 THE MONEY
 
-**At the truck, every job:**
+**At every job:**
 > ALL the cash → the ONE truck envelope. Don't split it. Don't do math. Just put it in.
 
-**At home, the number you know:**
-> Cash in the MAIN envelope. That's your one number.
+**The truck envelope is a ONE-WAY box.** 🚫 No grabbing a twenty out of it.
+**Want your money? You empty the WHOLE thing — and THAT'S when you split it:**
 
-**Taxes happen on the Sunday call — Zach walks you through it.** You don't do it alone.
+> **1. Dump it ALL out.**
+> **2. Tax OFF THE TOP first → 20% → TAXES–NOT MINE envelope.** *(20% for now. Zach may change it later.)*
+> **3. What's left = MAIN. THAT'S your money. Spend from MAIN, never the truck.**
+
+⚠️ **Tax comes off BEFORE you spend a dollar. Not "later." Later never happens.**
+
+**Stuck somewhere needing $20 and it's only in the truck?** Empty the WHOLE thing and split it right then. **Never take the twenty and leave the rest.** Touching it = emptying it. No exceptions.
+
+**MAIN envelope cash = your one number.** *(Already tax-clean. It's the number for the Sunday call.)*
 
 > Receipts → RECEIPTS envelope. Hand to Uncle Ron at tax time. Done.
 
@@ -48,7 +56,7 @@ One card per quoted job. Move it forward when the real thing happens. No app. No
 | Flipped on the dash | **Done — not paid yet** |
 | DONE envelope at home | **Paid — closed** ✅ |
 
-> A card stuck in one spot all week = something's stuck. That's what the visor shows you.
+> A card stuck in one spot all week = something's stuck. The visor shows you — every drive. No reminder needed.
 
 ---
 
@@ -61,14 +69,15 @@ That's the whole lead play. Not "look for leads." This exact thing.
 
 ---
 
-## 📞 SUNDAY CALL (Zach calls you — 10 min, no prep)
+## 📞 SUNDAY CALL (Zach calls you — 10 min, just brothers)
+
+Just a check-in. No prep. Nothing to do. Three questions:
 
 1. **How many jobs booked/completed this week?** (first 30 days: 4 paid jobs, any size)
-2. **What's the cash number?** (open MAIN envelope, read it)
-3. **Now move the tax cut → TAXES envelope.** (Zach tells you how much. Do it on the call.)
-4. **What's the one thing stuck?** (that's mine to help clear)
+2. **What's the cash number?** (open MAIN, read it — it's already tax-clean)
+3. **What's the one thing stuck?** (that's mine to help clear)
 
-> You don't prep. You don't run it. I call. You answer. Everything's already in front of you.
+> No tax math on the call — you already did that at the truck. No prep. I call, you answer, everything's already in front of you. Miss a week? Nothing breaks. We catch up next Sunday.
 
 ---
 
