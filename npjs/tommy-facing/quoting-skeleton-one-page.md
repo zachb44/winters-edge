@@ -1,3 +1,12 @@
+> # ⚠️ ARCHIVED — June 2026
+> **Superseded by `03_quoting_guide.md`** (in this folder).
+> This was the carry-on-the-job "glance card." Its quoting logic (5 steps, rates,
+> the net/gross floor, the big-3 answers) was folded into the teaching-style
+> quoting guide. A live quote tool / calculator is the planned Phase-2 replacement.
+> Kept for history only — **do not send this to Tommy.**
+
+---
+
 # 🧰 QUOTING — GLANCE CARD. DON'T READ IT. SCAN IT.
 
 **Run the 5 steps. Hit a hard question? → the BIG 3 box. Check the FLOOR before you say a number.**
