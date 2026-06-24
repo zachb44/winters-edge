@@ -1,3 +1,13 @@
+> # ⚠️ ARCHIVED — June 2026
+> **Superseded by the 3-doc teaching set:** `01_powerwashing_primer.md`,
+> `02_business_structure.md`, `03_quoting_guide.md` (in this folder).
+> This was the original command-style one-pager. The money system, leads-in-phone,
+> and Sunday-call ideas were rewritten into the teaching docs (the mandatory
+> Sunday cadence and the visor-card system were intentionally dropped/softened).
+> Kept for history only — **do not send this to Tommy.**
+
+---
+
 # NPJS — How The Business Runs
 **The whole business on one page. Don't read it. Scan it. Find your answer, go.**
 
